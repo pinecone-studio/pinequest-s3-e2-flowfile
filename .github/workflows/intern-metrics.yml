@@ -15,10 +15,10 @@ concurrency:
 
 env:
   OWNER: pinecone-studio
-  REPO: intern-3a
+  REPO: pinequest-s3-e2-flowfile
   START_DATE: '2026-01-01T00:00:00Z'
   END_DATE: '2026-12-31T23:59:59Z'
-  KV_KEY: 'classId:8'
+  KV_KEY: 'pinequest:pinequest-s3-e2-flowfile'
 
 jobs:
   metrics:
