@@ -1,0 +1,369 @@
+name: Intern Metrics → Cloudflare KV
+
+on:
+  schedule:
+    - cron: '0 1 * * *' # daily 01:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: intern-metrics
+  cancel-in-progress: true
+
+env:
+  OWNER: pinecone-studio
+  REPO: intern-3a
+  START_DATE: '2026-01-01T00:00:00Z'
+  END_DATE: '2026-12-31T23:59:59Z'
+  KV_KEY: 'classId:8'
+
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Install in isolated folder to avoid monorepo dependency resolution
+      - name: Install deps (isolated)
+        run: |
+          rm -rf .metrics-tool
+          mkdir -p .metrics-tool
+          npm install --prefix .metrics-tool @octokit/graphql tsx
+
+      - name: Compute PR metrics (per author)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ env.OWNER }}
+          REPO: ${{ env.REPO }}
+          START_DATE: ${{ env.START_DATE }}
+          END_DATE: ${{ env.END_DATE }}
+          KV_KEY: ${{ env.KV_KEY }}
+          NODE_PATH: ${{ github.workspace }}/.metrics-tool/node_modules
+        run: |
+          cat > /tmp/intern-metrics.ts << 'EOF'
+          import { graphql } from '@octokit/graphql';
+          import fs from 'node:fs';
+          import path from 'node:path';
+
+          type PullRequest = {
+            createdAt: string;
+            mergedAt: string | null;
+            updatedAt: string;
+            additions: number;
+            deletions: number;
+            author: { login: string; url: string; avatarUrl: string; email: string | null } | null;
+            commits: { totalCount: number } | null;
+            labels: { nodes: { name: string }[] } | null;
+          };
+
+          type DayEntry = {
+            date: string;
+            prsOpened: number;
+            prsMerged: number;
+            commits: number;
+          };
+
+          type LabelCount = {
+            label: string;
+            count: number;
+          };
+
+          type LeaderboardEntry = {
+            rank: number;
+            username: string;
+            avatarUrl: string;
+            profileUrl: string;
+            prsMerged: number;
+            commits: number;
+            additions: number;
+            deletions: number;
+            days: DayEntry[];
+            labels: LabelCount[];
+          };
+
+          type GraphQLResponse = {
+            repository: {
+              pullRequests: {
+                pageInfo: { hasNextPage: boolean; endCursor: string | null };
+                nodes: PullRequest[];
+              };
+            };
+          };
+
+          const { GITHUB_TOKEN, OWNER, REPO, START_DATE, END_DATE, KV_KEY } = process.env;
+
+          const present = (v: string | undefined): string => (v && v.length > 0 ? '✅' : '❌');
+          console.log('[env] OWNER:', OWNER);
+          console.log('[env] REPO:', REPO);
+          console.log('[env] START_DATE:', START_DATE);
+          console.log('[env] END_DATE:', END_DATE);
+          console.log('[env] KV_KEY:', KV_KEY);
+          console.log('[env] GITHUB_TOKEN present:', present(GITHUB_TOKEN));
+
+          const missing: string[] = [];
+          if (!GITHUB_TOKEN) missing.push('GITHUB_TOKEN');
+          if (!OWNER) missing.push('OWNER');
+          if (!REPO) missing.push('REPO');
+          if (!START_DATE) missing.push('START_DATE');
+          if (!END_DATE) missing.push('END_DATE');
+          if (!KV_KEY) missing.push('KV_KEY');
+          if (missing.length) {
+            console.error('Missing required env vars:', missing.join(', '));
+            process.exit(1);
+          }
+
+          const startMs = new Date(START_DATE!).getTime();
+          const endMs = new Date(END_DATE!).getTime();
+          if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+            console.error('START_DATE or END_DATE is not a valid ISO date string');
+            process.exit(1);
+          }
+          if (startMs > endMs) {
+            console.error('START_DATE must be <= END_DATE');
+            process.exit(1);
+          }
+
+          const client = graphql.defaults({
+            headers: { authorization: `token ${GITHUB_TOKEN}` },
+          });
+
+          const QUERY = `
+            query($owner: String!, $repo: String!, $cursor: String) {
+              repository(owner: $owner, name: $repo) {
+                pullRequests(
+                  first: 100,
+                  after: $cursor,
+                  orderBy: { field: UPDATED_AT, direction: DESC },
+                  states: [OPEN, CLOSED, MERGED]
+                ) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes {
+                    createdAt
+                    mergedAt
+                    updatedAt
+                    additions
+                    deletions
+                    author { login url avatarUrl ... on User { email } }
+                    commits { totalCount }
+                    labels(first: 20) { nodes { name } }
+                  }
+                }
+              }
+            }
+          `;
+
+          const toDateKey = (iso: string): string => {
+            const date = new Date(iso);
+            return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Ulaanbaatar' });
+          };
+
+          const inWindow = (iso: string | null): boolean => {
+            if (!iso) return false;
+            const t = new Date(iso).getTime();
+            return t >= startMs && t <= endMs;
+          };
+
+          type UserData = {
+            avatarUrl: string;
+            profileUrl: string;
+            prsMerged: number;
+            commits: number;
+            additions: number;
+            deletions: number;
+            days: Record<string, { prsOpened: number; prsMerged: number; commits: number }>;
+            labels: Record<string, number>;
+          };
+
+          async function main(): Promise<void> {
+            const users: Record<string, UserData> = {};
+
+            let cursor: string | null = null;
+            let stopSoon = false;
+            let pages = 0;
+            let prsScanned = 0;
+            let prsRelevant = 0;
+
+            while (true) {
+              pages += 1;
+              const data = (await client(QUERY, { owner: OWNER, repo: REPO, cursor })) as GraphQLResponse;
+              const conn = data.repository.pullRequests;
+
+              console.log(`[scan] page ${pages} — received ${conn.nodes.length} PRs`);
+
+              for (const pr of conn.nodes) {
+                prsScanned += 1;
+
+                const login = pr.author?.login;
+                if (!login) continue;
+                if (login.endsWith('[bot]')) continue;
+
+                const openedInWindow = inWindow(pr.createdAt);
+                const mergedInWindow = inWindow(pr.mergedAt);
+
+                if (!openedInWindow && !mergedInWindow) continue;
+                prsRelevant += 1;
+
+                if (!users[login]) {
+                  users[login] = {
+                    avatarUrl: pr.author?.avatarUrl ?? `https://github.com/${login}.png`,
+                    profileUrl: pr.author?.url ?? `https://github.com/${login}`,
+                    prsMerged: 0,
+                    commits: 0,
+                    additions: 0,
+                    deletions: 0,
+                    days: {},
+                    labels: {},
+                  };
+                }
+
+                const user = users[login];
+
+                if (openedInWindow) {
+                  const date = toDateKey(pr.createdAt);
+                  if (!user.days[date]) user.days[date] = { prsOpened: 0, prsMerged: 0, commits: 0 };
+                  user.days[date].prsOpened += 1;
+                }
+
+                if (mergedInWindow) {
+                  const date = toDateKey(pr.mergedAt!);
+                  if (!user.days[date]) user.days[date] = { prsOpened: 0, prsMerged: 0, commits: 0 };
+
+                  const commits = pr.commits?.totalCount ?? 0;
+                  user.days[date].prsMerged += 1;
+                  user.days[date].commits += commits;
+
+                  user.prsMerged += 1;
+                  user.commits += commits;
+                  user.additions += pr.additions ?? 0;
+                  user.deletions += pr.deletions ?? 0;
+
+                  for (const label of pr.labels?.nodes ?? []) {
+                    user.labels[label.name] = (user.labels[label.name] ?? 0) + 1;
+                  }
+                }
+
+                if (new Date(pr.updatedAt).getTime() < startMs) stopSoon = true;
+              }
+
+              if (!conn.pageInfo.hasNextPage) break;
+              cursor = conn.pageInfo.endCursor;
+              if (stopSoon) break;
+            }
+
+            const leaderboard: LeaderboardEntry[] = Object.entries(users)
+              .map(([username, data]) => ({
+                rank: 0,
+                username,
+                avatarUrl: data.avatarUrl,
+                profileUrl: data.profileUrl,
+                prsMerged: data.prsMerged,
+                commits: data.commits,
+                additions: data.additions,
+                deletions: data.deletions,
+                days: Object.entries(data.days)
+                  .map(([date, stats]) => ({ date, ...stats }))
+                  .sort((a, b) => a.date.localeCompare(b.date)),
+                labels: Object.entries(data.labels)
+                  .map(([label, count]) => ({ label, count }))
+                  .sort((a, b) => b.count - a.count),
+              }))
+              .sort((a, b) => {
+                if (b.prsMerged !== a.prsMerged) return b.prsMerged - a.prsMerged;
+                return b.commits - a.commits;
+              })
+              .map((entry, i) => ({ ...entry, rank: i + 1 }));
+
+            const globalLabels: Record<string, { total: number; students: Record<string, number> }> = {};
+            for (const [username, data] of Object.entries(users)) {
+              for (const [label, count] of Object.entries(data.labels)) {
+                if (!globalLabels[label]) globalLabels[label] = { total: 0, students: {} };
+                globalLabels[label].total += count;
+                globalLabels[label].students[username] = count;
+              }
+            }
+
+            console.log(`[done] scanned PRs: ${prsScanned}, relevant PRs: ${prsRelevant}, users: ${leaderboard.length}`);
+
+            const out = {
+              key: KV_KEY,
+              owner: OWNER,
+              repo: REPO,
+              window: { start: START_DATE, end: END_DATE },
+              generatedAt: new Date().toISOString(),
+              leaderboard,
+            };
+
+            const metricsDir = '/tmp/metrics';
+            fs.mkdirSync(metricsDir, { recursive: true });
+            fs.writeFileSync(`${metricsDir}/intern-metrics.json`, JSON.stringify(out, null, 2));
+            console.log('✅ Wrote /tmp/metrics/intern-metrics.json');
+          }
+
+          main().catch((err) => {
+            console.error('Error:', err);
+            process.exit(1);
+          });
+          EOF
+          .metrics-tool/node_modules/.bin/tsx /tmp/intern-metrics.ts
+
+      - name: Upload to Cloudflare KV
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          present() { if [ -n "${1:-}" ]; then echo "✅"; else echo "❌"; fi; }
+          echo "[env] CF_ACCOUNT_ID present: $(present "${CF_ACCOUNT_ID:-}")"
+          echo "[env] CF_KV_NAMESPACE_ID present: $(present "${CF_KV_NAMESPACE_ID:-}")"
+          echo "[env] CF_API_TOKEN present: $(present "${CF_API_TOKEN:-}")"
+          echo "[env] KV_KEY: ${KV_KEY}"
+
+          if [ ! -f /tmp/metrics/intern-metrics.json ]; then
+            echo "❌ /tmp/metrics/intern-metrics.json not found"
+            exit 1
+          fi
+
+          if [ -z "${CF_ACCOUNT_ID:-}" ] || [ -z "${CF_KV_NAMESPACE_ID:-}" ] || [ -z "${CF_API_TOKEN:-}" ]; then
+            echo "❌ Missing Cloudflare secrets (CF_ACCOUNT_ID / CF_KV_NAMESPACE_ID / CF_API_TOKEN)"
+            exit 1
+          fi
+
+          echo "Uploading metrics to Cloudflare KV key: $KV_KEY"
+          curl -sS -X PUT \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/storage/kv/namespaces/$CF_KV_NAMESPACE_ID/values/$KV_KEY" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/metrics/intern-metrics.json \
+            | tee /tmp/cf_kv_response.json
+
+          if command -v jq >/dev/null 2>&1; then
+            if ! jq -e '.success == true' /tmp/cf_kv_response.json >/dev/null; then
+              echo "❌ Cloudflare KV upload failed"
+              cat /tmp/cf_kv_response.json
+              exit 1
+            fi
+          else
+            if ! grep -Eq '"success"[[:space:]]*:[[:space:]]*true' /tmp/cf_kv_response.json; then
+              echo "❌ Cloudflare KV upload failed"
+              cat /tmp/cf_kv_response.json
+              exit 1
+            fi
+          fi
+
+          echo "✅ Cloudflare KV upload success"
+
+          echo "Verifying KV read-back..."
+          curl -sS \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/storage/kv/namespaces/$CF_KV_NAMESPACE_ID/values/$KV_KEY" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            | head -c 200 && echo
