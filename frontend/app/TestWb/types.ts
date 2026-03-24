@@ -18,3 +18,12 @@ export type QuestionItem = {
   placeholder: string;
   choices?: ChoiceOption[];
 };
+
+export type TestWbState = {
+  currentAnswer: string;
+  currentChoice: string | null;
+  isComplete: boolean;
+  isLastQuestion: boolean;
+  isReady: boolean;
+  nextLabel: string;
+};
