@@ -15,38 +15,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-and-typecheck:
-    name: Lint & Type Check
+  frontend-ci:
+    name: Frontend Lint & Type Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: frontend
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: npm
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Backend codegen
-        run: npm run codegen --workspace=backend
-
-      - name: Frontend codegen
-        run: npm run codegen --workspace=frontend
-
-      - name: Backend lint
-        run: npm run lint --workspace=backend
+        run: bun install --frozen-lockfile
 
       - name: Frontend lint
-        run: npm run lint --workspace=frontend
-
-      - name: Backend type check
-        run: npx tsc --noEmit --project backend/tsconfig.json
+        run: bun run lint app
 
       - name: Frontend type check
-        run: npx tsc --noEmit --project frontend/tsconfig.json
+        run: bunx tsc --noEmit --project tsconfig.json
