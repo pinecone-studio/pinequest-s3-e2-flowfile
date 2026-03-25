@@ -1,19 +1,39 @@
-# dependencies (bun install)
-node_modules
+# compiled output
+/dist
+/node_modules
+/build
 
-# output
-out
-dist
-*.tgz
-
-# code coverage
-coverage
-*.lcov
-
-# logs
+# Logs
 logs
-_.log
-report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+
+# Tests
+/coverage
+/.nyc_output
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
 # dotenv environment variable files
 .env
@@ -22,13 +42,15 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .env.production.local
 .env.local
 
-# caches
-.eslintcache
-.cache
-*.tsbuildinfo
+# temp directory
+.temp
+.tmp
 
-# IntelliJ based IDEs
-.idea
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
 
-# Finder (MacOS) folder config
-.DS_Store
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
