@@ -1,9 +1,11 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { users } from "./users.schema";
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { users } from './users.schema';
 
 export const exams = sqliteTable('exams', {
   id: text('id').primaryKey(),
-  teacherId: text('teacher_id').notNull().references(() => users.id),
+  teacherId: text('teacher_id')
+    .notNull()
+    .references(() => users.id),
   title: text('title').notNull(),
   subject: text('subject').notNull(),
   description: text('description'),
@@ -28,7 +30,6 @@ export const exams = sqliteTable('exams', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
- 
 
 export const examEnrollments = sqliteTable('exam_enrollments', {
   id: text('id').primaryKey(),
@@ -36,5 +37,3 @@ export const examEnrollments = sqliteTable('exam_enrollments', {
   studentId: text('student_id').notNull(),
   assignedAt: text('assigned_at').notNull(),
 });
- 
-
