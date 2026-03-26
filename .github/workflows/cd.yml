@@ -13,6 +13,9 @@ jobs:
   deploy-backend:
     name: Deploy NestJS Backend to Railway
     runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_SERVICE_NAME: ${{ vars.RAILWAY_SERVICE_NAME || secrets.RAILWAY_SERVICE_NAME }}
 
     defaults:
       run:
@@ -41,10 +44,19 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
+      - name: Validate Railway configuration
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "Missing GitHub secret: RAILWAY_TOKEN" >&2
+            exit 1
+          fi
+          if [ -z "$RAILWAY_SERVICE_NAME" ]; then
+            echo "Missing Railway service name. Set repository variable RAILWAY_SERVICE_NAME or secret RAILWAY_SERVICE_NAME." >&2
+            exit 1
+          fi
+
       - name: Deploy backend to Railway
-        run: railway up --service ${{ secrets.RAILWAY_SERVICE_NAME }}
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --service "$RAILWAY_SERVICE_NAME"
 
   deploy-frontend:
     name: Deploy Frontend to Vercel
