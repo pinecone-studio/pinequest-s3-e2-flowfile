@@ -3,4 +3,7 @@ import { users } from 'src/database/schema';
 
 export type User = InferSelectModel<typeof users>;
 export type NewUser = InferInsertModel<typeof users>;
-export type UpdateUser = Partial<Omit<NewUser, 'id' | 'createdAt'>>;
+export type UpdateUser = Partial<
+  Omit<NewUser, 'id' | 'createdAt' | 'updatedAt'>
+>;
+export type UserRole = 'teacher' | 'student';

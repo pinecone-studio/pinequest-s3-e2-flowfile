@@ -12,6 +12,12 @@ export class UserRepository {
     });
   }
 
+  async findByClerkUserId(clerkUserId: string) {
+    return db.query.users.findFirst({
+      where: eq(users.clerkUserId, clerkUserId),
+    });
+  }
+
   async findByEmail(email: string) {
     return db.query.users.findFirst({
       where: eq(users.email, email),
