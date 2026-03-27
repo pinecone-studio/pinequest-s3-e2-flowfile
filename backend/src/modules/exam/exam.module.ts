@@ -2,12 +2,12 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from 'src/database/database.module';
 import { ExamService } from './exam.service';
 import { ExamController } from './exam.controller';
-import { ExamResolver } from './exam.resolver';
 import { ExamRepository } from './exam.repository';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [DatabaseModule],
-  providers: [ExamService, ExamResolver, ExamRepository],
+  imports: [DatabaseModule, AuthModule],
+  providers: [ExamService, ExamRepository],
   controllers: [ExamController],
   exports: [ExamService],
 })
