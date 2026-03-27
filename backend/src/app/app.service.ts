@@ -1,11 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AppService {
-  constructor(private configService: ConfigService) {}
+  constructor(@Optional() private readonly configService?: ConfigService) {}
 
-  getSupabaseUrl() {
-    return this.configService.get<string>('SUPABASE_URL');
-w  }
+  getHello(): string {
+    return 'Hello World!';
+  }
+
+  getSupabaseUrl(): string | undefined {
+    return this.configService?.get<string>('SUPABASE_URL');
+  }
 }
