@@ -7,16 +7,12 @@ import {
 } from 'class-validator';
 import type { QuestionInputType } from 'src/shared/types';
 
-export class CreateQuestionDto {
+export class UpdateQuestionDto {
+  @IsOptional()
   @IsString()
-  examId: string;
+  content?: string;
 
-  @IsInt()
-  orderIndex: number;
-
-  @IsString()
-  content: string;
-
+  @IsOptional()
   @IsEnum([
     'mcq',
     'short_text',
@@ -26,7 +22,7 @@ export class CreateQuestionDto {
     'handwritten',
     'voice_record',
   ])
-  inputType: QuestionInputType;
+  inputType?: QuestionInputType;
 
   @IsOptional()
   @IsString()
