@@ -7,5 +7,5 @@ export class AppService {
 
   getSupabaseUrl() {
     return this.configService.get<string>('SUPABASE_URL');
-  }
+w  }
 }
