@@ -1,9 +1,13 @@
-import { IsString, IsInt, IsBoolean, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsInt,
+  IsBoolean,
+  IsOptional,
+  IsISO8601,
+  Min,
+} from 'class-validator';
 
 export class CreateExamDto {
-  @IsString()
-  teacherId: string;
-
   @IsString()
   title: string;
 
@@ -15,6 +19,7 @@ export class CreateExamDto {
   description?: string;
 
   @IsInt()
+  @Min(1)
   durationMinutes: number;
 
   @IsOptional()
@@ -31,13 +36,14 @@ export class CreateExamDto {
 
   @IsOptional()
   @IsInt()
+  @Min(0)
   maxTabSwitches?: number;
 
   @IsOptional()
-  @IsString()
+  @IsISO8601()
   startsAt?: string;
 
   @IsOptional()
-  @IsString()
+  @IsISO8601()
   endsAt?: string;
 }

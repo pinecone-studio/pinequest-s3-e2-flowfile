@@ -1,4 +1,4 @@
-import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
+/*import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
 import { ExamService } from './exam.service';
 import { CreateExamDto } from './dto/create-exam.dto';
 
@@ -44,4 +44,4 @@ export class ExamResolver {
   deleteExam(@Args('id') id: string) {
     return this.examService.deleteExam(id);
   }
-}
+}*/
