@@ -1,0 +1,118 @@
+type Exam {
+  id: ID!
+  teacherId: String!
+  title: String!
+  subject: String!
+  description: String
+  status: String!
+  durationMinutes: Int!
+  shuffleQuestions: Boolean!
+  allowCopyPaste: Boolean!
+  requireFullscreen: Boolean!
+  maxTabSwitches: Int!
+  startsAt: String
+  endsAt: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Question {
+  id: ID!
+  examId: String!
+  orderIndex: Int!
+  content: String!
+  inputType: String!
+  subjectHint: String
+  points: Int!
+  isRequired: Boolean!
+  optionsJson: String
+  correctAnswer: String
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Session {
+  id: ID!
+  examId: String!
+  studentId: String!
+  status: String!
+  startedAt: String
+  submittedAt: String
+  score: Int
+  isFlagged: Boolean!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type MonitoringEvent {
+  id: ID!
+  sessionId: String!
+  studentId: String!
+  examId: String!
+  eventType: String!
+  metadataJson: String
+  occurredAt: String!
+  createdAt: String!
+}
+
+type Notification {
+  id: ID!
+  recipientId: String!
+  examId: String
+  sessionId: String
+  title: String!
+  body: String!
+  type: String!
+  isRead: Boolean!
+  createdAt: String!
+}
+
+type SubjectReportItem {
+  subject: String!
+  examCount: Int!
+  sessionCount: Int!
+  suspiciousEventCount: Int!
+}
+
+type TeacherReportItem {
+  teacherId: String!
+  examCount: Int!
+  publishedExamCount: Int!
+  scheduledExamCount: Int!
+}
+
+type AdminDashboard {
+  totalExams: Int!
+  totalScheduledExams: Int!
+  totalPublishedExams: Int!
+  totalSessions: Int!
+  totalSuspiciousEvents: Int!
+  recentEvents: [MonitoringEvent!]!
+}
+
+type TeacherExamDetail {
+  exam: Exam!
+  questions: [Question!]!
+  sessions: [Session!]!
+  suspiciousEvents: [MonitoringEvent!]!
+  notifications: [Notification!]!
+  totalQuestions: Int!
+  totalSessions: Int!
+  submittedSessions: Int!
+  flaggedSessions: Int!
+}
+
+type ReportsOverview {
+  totalExams: Int!
+  totalSessions: Int!
+  totalSubmittedSessions: Int!
+  totalSuspiciousEvents: Int!
+  subjectBreakdown: [SubjectReportItem!]!
+  teacherBreakdown: [TeacherReportItem!]!
+}
+
+type Query {
+  adminDashboard(limit: Int = 10): AdminDashboard!
+  teacherExamDetail(examId: ID!): TeacherExamDetail!
+  reportsOverview: ReportsOverview!
+}
