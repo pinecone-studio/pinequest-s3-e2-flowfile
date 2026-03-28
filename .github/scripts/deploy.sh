@@ -1,4 +1,4 @@
 #!/bin/bash
-npm install
-npm run build
+yarn install
+yarn build
 echo "Deploying app..."
