@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from 'next'
 import { Montserrat } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
-import { DataInitializer } from '@/components/data-initializer'
-import { PlatformSwitcher } from '@/components/platform-switcher'
+import { DataInitializer } from '@/components/DataInitializer'
 import { Toaster } from '@/components/ui/toaster'
+import { PlatformSwitcher } from '@/components/PlatformSwitcher'
 
 const montserrat = Montserrat({ 
   subsets: ['latin', 'cyrillic'],
