@@ -12,15 +12,15 @@ const montserrat = Montserrat({
   variable: '--font-montserrat',
 })
 
-// export const metadata: Metadata = {
-//   title: 'e-Shalgalt | Үндэсний шалгалтын систем',
-//   description: 'Монгол улсын боловсролын үндэсний шалгалт, үнэлгээний платформ',
-//   generator: 'v0.app',
-// }
+export const metadata: Metadata = {
+  title: 'e-Shalgalt | Үндэсний шалгалтын систем',
+  description: 'Монгол улсын боловсролын үндэсний шалгалт, үнэлгээний платформ',
+  generator: 'v0.app',
+}
 
-// export const viewport: Viewport = {
-//   themeColor: '#0A2D6E',
-// }
+export const viewport: Viewport = {
+  themeColor: '#0A2D6E',
+}
 
 export default function RootLayout({
   children,
