@@ -1,6 +1,5 @@
-'use client'
+import { useExamTaking } from "@/hooks/useExamTaking"
 
-import { useExamTaking } from "../hooks/useExamTaking"
 
 export default function StudentExamTakingPage({ id }: { id: string }) {
   const data = useExamTaking()
