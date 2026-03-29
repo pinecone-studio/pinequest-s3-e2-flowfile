@@ -2,15 +2,20 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 
 import { NewExam, ExamStatus } from 'src/shared/types/exam.types';
 import { ExamRepository } from './exam.repository';
 import { CreateExamDto } from './dto/create-exam.dto';
+import { QuestionRepository } from '../question/question.repository';
 
 @Injectable()
 export class ExamService {
-  constructor(private readonly examRepo: ExamRepository) {}
+  constructor(
+    private readonly examRepo: ExamRepository,
+    private readonly questionRepo: QuestionRepository,
+  ) {}
 
   async getAllExams() {
     return this.examRepo.findAllExams();
@@ -31,6 +36,8 @@ export class ExamService {
   }
 
   async createExam(teacherId: string, dto: CreateExamDto) {
+    this.validateExamSchedule(dto.startsAt, dto.endsAt);
+
     const now = new Date().toISOString();
 
     const data: NewExam = {
@@ -65,6 +72,24 @@ export class ExamService {
       throw new ForbiddenException('You cannot update this exam');
     }
 
+    if (exam.status === status) {
+      return exam;
+    }
+
+    this.validateStatusTransition(exam.status, status);
+
+    if (status === 'scheduled' || status === 'published') {
+      this.validateExamSchedule(exam.startsAt, exam.endsAt);
+
+      const questions = await this.questionRepo.findQuestionsByExam(id);
+
+      if (questions.length === 0) {
+        throw new BadRequestException(
+          'Exam must have at least one question before it can be scheduled or published',
+        );
+      }
+    }
+
     return this.examRepo.updateExamStatus(id, status);
   }
 
@@ -80,5 +105,33 @@ export class ExamService {
     }
 
     return this.examRepo.deleteExam(id);
+  }
+
+  private validateExamSchedule(startsAt?: string | null, endsAt?: string | null) {
+    if (!startsAt || !endsAt) {
+      return;
+    }
+
+    if (new Date(startsAt) >= new Date(endsAt)) {
+      throw new BadRequestException('Exam start time must be before end time');
+    }
+  }
+
+  private validateStatusTransition(
+    currentStatus: ExamStatus,
+    nextStatus: ExamStatus,
+  ) {
+    const allowedTransitions: Record<ExamStatus, ExamStatus[]> = {
+      draft: ['scheduled', 'published'],
+      scheduled: ['published', 'closed'],
+      published: ['closed'],
+      closed: [],
+    };
+
+    if (!allowedTransitions[currentStatus].includes(nextStatus)) {
+      throw new BadRequestException(
+        `Cannot change exam status from ${currentStatus} to ${nextStatus}`,
+      );
+    }
   }
 }
