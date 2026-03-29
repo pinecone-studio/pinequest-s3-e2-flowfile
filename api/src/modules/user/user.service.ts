@@ -1,6 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { UserRepository } from 'src/database/repositories/user.repository';
 import { NewUser, UpdateUser, UserRole } from 'src/shared/types/user.types';
+import type { AuthenticatedUser } from 'src/modules/auth/interfaces/authenticated-user.interface';
 
 interface ClerkUserPayload {
   clerkUserId: string;
@@ -24,6 +29,14 @@ export class UserService {
     return user;
   }
 
+  async getByIdForUser(id: string, requester: AuthenticatedUser) {
+    if (requester.id !== id) {
+      throw new ForbiddenException('You can only access your own user profile');
+    }
+
+    return this.getById(id);
+  }
+
   async getByClerkUserId(clerkUserId: string) {
     const user = await this.userRepository.findByClerkUserId(clerkUserId);
 
@@ -38,7 +51,11 @@ export class UserService {
     return this.userRepository.findAllByRole(role);
   }
 
-  async updateUser(id: string, data: UpdateUser) {
+  async updateUser(id: string, data: UpdateUser, requester: AuthenticatedUser) {
+    if (requester.id !== id) {
+      throw new ForbiddenException('You can only update your own user profile');
+    }
+
     const existingUser = await this.userRepository.findById(id);
 
     if (!existingUser) {
