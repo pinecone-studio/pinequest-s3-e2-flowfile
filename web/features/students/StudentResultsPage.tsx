@@ -1,6 +1,6 @@
 'use client'
 
-import { useResults } from "../hooks/useResults"
+import { useResults } from "@/hooks/useResults"
 import ResultsList from "../components/ResultsList"
 
 export default function StudentResultsPage() {
