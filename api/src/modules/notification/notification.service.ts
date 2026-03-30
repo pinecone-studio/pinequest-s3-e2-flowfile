@@ -6,7 +6,9 @@ import type { NewNotification } from 'src/shared/types';
 export class NotificationService {
   constructor(private readonly notificationRepo: NotificationRepository) {}
 
-  async createNotification(data: Omit<NewNotification, 'id' | 'isRead' | 'createdAt'>) {
+  async createNotification(
+    data: Omit<NewNotification, 'id' | 'isRead' | 'createdAt'>,
+  ) {
     const now = new Date().toISOString();
 
     return this.notificationRepo.createNotification({
