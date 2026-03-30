@@ -1,6 +1,30 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { UserService } from 'src/modules/user/user.service';
 
+interface ClerkTokenPayload {
+  sub: string;
+  email: string;
+  name?: string;
+  imageUrl?: string | null;
+}
+
+function isClerkTokenPayload(value: unknown): value is ClerkTokenPayload {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const payload = value as Record<string, unknown>;
+
+  return (
+    typeof payload.sub === 'string' &&
+    typeof payload.email === 'string' &&
+    (payload.name === undefined || typeof payload.name === 'string') &&
+    (payload.imageUrl === undefined ||
+      payload.imageUrl === null ||
+      typeof payload.imageUrl === 'string')
+  );
+}
+
 @Injectable()
 export class AuthService {
   constructor(private readonly userService: UserService) {}
@@ -12,7 +36,7 @@ export class AuthService {
 
     const token = authHeader.replace('Bearer ', '');
 
-    let payload: any;
+    let payload: unknown;
 
     try {
       payload = JSON.parse(Buffer.from(token, 'base64').toString());
@@ -20,11 +44,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid token format');
     }
 
-    const { sub, email, name, imageUrl } = payload;
-
-    if (!sub || !email) {
+    if (!isClerkTokenPayload(payload)) {
       throw new UnauthorizedException('Invalid token payload');
     }
+
+    const { sub, email, name, imageUrl } = payload;
 
     const user = await this.userService.findOrCreateFromClerk({
       clerkUserId: sub,
