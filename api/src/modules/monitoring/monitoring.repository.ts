@@ -41,6 +41,23 @@ export class MonitoringRepository {
     return result?.count ?? 0;
   }
 
+  async countEventsBySessionAndType(
+    sessionId: string,
+    eventType: NewMonitoringEvent['eventType'],
+  ) {
+    const [result] = await db
+      .select({ count: count() })
+      .from(suspiciousEvents)
+      .where(
+        and(
+          eq(suspiciousEvents.sessionId, sessionId),
+          eq(suspiciousEvents.eventType, eventType),
+        ),
+      );
+
+    return result?.count ?? 0;
+  }
+
   async findRecentEvents(limit = 10) {
     return db.query.suspiciousEvents.findMany({
       orderBy: desc(suspiciousEvents.occurredAt),

@@ -8,8 +8,9 @@ import { MonitoringRepository } from './monitoring.repository';
 import { SessionRepository } from '../session/session.repository';
 import { ExamRepository } from '../exam/exam.repository';
 import { NotificationService } from '../notification/notification.service';
-import type { NewMonitoringEvent } from 'src/shared/types';
+import type { NewMonitoringEvent } from 'src/shared/types/monitoring.types';
 import type { AuthenticatedUser } from 'src/modules/auth/interfaces/authenticated-user.interface';
+import { SessionService } from '../session/session.service';
 
 @Injectable()
 export class MonitoringService {
@@ -18,15 +19,19 @@ export class MonitoringService {
     private readonly sessionRepo: SessionRepository,
     private readonly examRepo: ExamRepository,
     private readonly notificationService: NotificationService,
+    private readonly sessionService: SessionService,
   ) {}
 
-  async logEvent(data: {
-    sessionId: string;
-    studentId: string;
-    examId: string;
-    eventType: NewMonitoringEvent['eventType'];
-    metadataJson?: string;
-  }, user: AuthenticatedUser) {
+  async logEvent(
+    data: {
+      sessionId: string;
+      studentId: string;
+      examId: string;
+      eventType: NewMonitoringEvent['eventType'];
+      metadataJson?: string;
+    },
+    user: AuthenticatedUser,
+  ) {
     const session = await this.sessionRepo.findSessionById(data.sessionId);
 
     if (!session) {
@@ -34,11 +39,21 @@ export class MonitoringService {
     }
 
     if (session.studentId !== user.id) {
-      throw new ForbiddenException('You cannot log monitoring events for this session');
+      throw new ForbiddenException(
+        'You cannot log monitoring events for this session',
+      );
     }
 
     if (session.status !== 'in_progress') {
-      throw new BadRequestException('Monitoring events can only be logged for active sessions');
+      throw new BadRequestException(
+        'Monitoring events can only be logged for active sessions',
+      );
+    }
+
+    const exam = await this.examRepo.findExamById(session.examId);
+
+    if (!exam) {
+      throw new NotFoundException('Exam not found');
     }
 
     const now = new Date().toISOString();
@@ -53,7 +68,16 @@ export class MonitoringService {
       createdAt: now,
     });
 
-    await this.notificationTeacher(event.examId, event.sessionId, event.eventType);
+    await this.notificationTeacher(
+      event.examId,
+      event.sessionId,
+      event.eventType,
+    );
+    await this.maybeForceSubmitForTabLimit(
+      session.id,
+      event.eventType,
+      exam.maxTabSwitches,
+    );
 
     return event;
   }
@@ -80,7 +104,10 @@ export class MonitoringService {
     return this.monitoringRepo.findEventsBySession(sessionId);
   }
 
-  async getDashboardStats(userOrLimit?: AuthenticatedUser | number, limit = 20) {
+  async getDashboardStats(
+    userOrLimit?: AuthenticatedUser | number,
+    limit = 20,
+  ) {
     const recentEvents = await this.monitoringRepo.findRecentEvents(limit);
     const user =
       typeof userOrLimit === 'number' || !userOrLimit ? undefined : userOrLimit;
@@ -103,7 +130,9 @@ export class MonitoringService {
       );
     }
 
-    const uniqueStudents = new Set(teacherEvents.map((event) => event.studentId));
+    const uniqueStudents = new Set(
+      teacherEvents.map((event) => event.studentId),
+    );
 
     return {
       totalEvents: teacherEvents.length,
@@ -149,9 +178,46 @@ export class MonitoringService {
     }
 
     if (exam.teacherId !== teacherId) {
-      throw new ForbiddenException('You cannot access monitoring for this exam');
+      throw new ForbiddenException(
+        'You cannot access monitoring for this exam',
+      );
     }
 
     return exam;
+  }
+
+  private async maybeForceSubmitForTabLimit(
+    sessionId: string,
+    eventType: NewMonitoringEvent['eventType'],
+    maxTabSwitches: number,
+  ) {
+    if (eventType !== 'tab_switch' || maxTabSwitches <= 0) {
+      return;
+    }
+
+    const tabSwitchCount =
+      await this.monitoringRepo.countEventsBySessionAndType(
+        sessionId,
+        'tab_switch',
+      );
+
+    if (tabSwitchCount < maxTabSwitches) {
+      return;
+    }
+
+    const session = await this.sessionRepo.findSessionById(sessionId);
+
+    if (!session) {
+      return;
+    }
+
+    if (!session.isFlagged) {
+      await this.sessionRepo.flagSession(sessionId);
+    }
+
+    await this.sessionService.forceSubmitSession(
+      sessionId,
+      'tab_limit_exceeded',
+    );
   }
 }
