@@ -22,7 +22,10 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get(':id')
-  async getById(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  async getById(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.userService.getByIdForUser(id, user);
   }
 
