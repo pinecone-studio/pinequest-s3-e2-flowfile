@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { eq, and } from 'drizzle-orm';
 import { db } from 'src/database/client';
-import { examEnrollments } from 'src/database/schema';
+import { examEnrollments } from 'src/database/schema/exams.schema';
+import type { Enrollment } from 'src/shared/types/enrollment.types';
 
 @Injectable()
 export class EnrollmentRepository {
-  async enrollStudent(examId: string, studentId: string) {
+  async enrollStudent(examId: string, studentId: string): Promise<Enrollment> {
     const [enrollment] = await db
       .insert(examEnrollments)
       .values({
@@ -18,13 +19,13 @@ export class EnrollmentRepository {
     return enrollment;
   }
 
-  async findEnrollmentsByExam(examId: string) {
+  async findEnrollmentsByExam(examId: string): Promise<Enrollment[]> {
     return db.query.examEnrollments.findMany({
       where: eq(examEnrollments.examId, examId),
     });
   }
 
-  async findEnrollmentsByStudent(studentId: string) {
+  async findEnrollmentsByStudent(studentId: string): Promise<Enrollment[]> {
     return db.query.examEnrollments.findMany({
       where: eq(examEnrollments.studentId, studentId),
     });
