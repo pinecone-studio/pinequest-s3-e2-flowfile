@@ -1,19 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from 'src/database/client';
-import { answers } from 'src/database/schema';
-import type { NewAnswer } from 'src/shared/types';
+import { answers } from 'src/database/schema/sessions.schema';
+import type { Answer, NewAnswer } from 'src/shared/types/answer.types';
 
 @Injectable()
 export class AnswerRepository {
-  async findAnswersBySession(sessionId: string) {
+  async findAnswersBySession(sessionId: string): Promise<Answer[]> {
     return db.query.answers.findMany({
       where: eq(answers.sessionId, sessionId),
       orderBy: desc(answers.lastSavedAt),
     });
   }
 
-  async findAnswerByQuestion(sessionId: string, questionId: string) {
+  async findAnswerByQuestion(
+    sessionId: string,
+    questionId: string,
+  ): Promise<Answer | undefined> {
     return db.query.answers.findFirst({
       where: and(
         eq(answers.sessionId, sessionId),
@@ -44,7 +47,7 @@ export class AnswerRepository {
       return answer;
     }
 
-    const [answer] = await db.insert(answers).values(data as NewAnswer).returning();
+    const [answer] = await db.insert(answers).values(data).returning();
     return answer;
   }
 
