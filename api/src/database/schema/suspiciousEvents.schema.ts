@@ -1,19 +1,19 @@
-import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { pgTable, text } from 'drizzle-orm/pg-core';
 import { users } from './users.schema';
 import { exams } from './exams.schema';
 import { examSessions } from './sessions.schema';
 
-export const suspiciousEvents = sqliteTable('suspicious_events', {
+export const suspiciousEvents = pgTable('suspicious_events', {
   id: text('id').primaryKey(),
   sessionId: text('session_id')
     .notNull()
-    .references(() => examSessions.id),
+    .references(() => examSessions.id, { onDelete: 'cascade' }),
   studentId: text('student_id')
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: 'cascade' }),
   examId: text('exam_id')
     .notNull()
-    .references(() => exams.id),
+    .references(() => exams.id, { onDelete: 'cascade' }),
   eventType: text('event_type', {
     enum: [
       'tab_switch',
