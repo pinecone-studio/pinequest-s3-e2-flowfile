@@ -5,7 +5,7 @@
     "buildCommand": "yarn build"
   },
   "deploy": {
-    "startCommand": "node dist/main",
+    "startCommand": "node dist/src/main.js",
     "healthcheckPath": "/"
   }
 }
