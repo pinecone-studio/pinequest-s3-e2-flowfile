@@ -1,33 +1,60 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { MonitoringService } from './monitoring.service';
 import { CreateEventDto } from './dto/create-event.dto';
+import { ClerkAuthGuard } from 'src/modules/auth/guards/clerk-auth.guard';
+import { RolesGuard } from 'src/modules/auth/guards/roles.guard';
+import { Roles } from 'src/modules/auth/decorators/roles.decorator';
+import { CurrentUser } from 'src/modules/auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from 'src/modules/auth/interfaces/authenticated-user.interface';
 
 @Controller('monitoring')
+@UseGuards(ClerkAuthGuard, RolesGuard)
 export class MonitoringController {
   constructor(private readonly monitoringService: MonitoringService) {}
 
   @Post('events')
-  logEvent(@Body() body: CreateEventDto) {
-    return this.monitoringService.logEvent(body);
+  @Roles('student')
+  logEvent(@Body() body: CreateEventDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.monitoringService.logEvent(body, user);
   }
 
   @Get('events/exam/:examId')
-  getEventsByExam(@Param('examId') examId: string) {
-    return this.monitoringService.getEventsByExam(examId);
+  @Roles('teacher')
+  getEventsByExam(
+    @Param('examId') examId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.monitoringService.getEventsByExam(examId, user);
   }
 
   @Get('events/session/:sessionId')
-  getEventsBySession(@Param('sessionId') sessionId: string) {
-    return this.monitoringService.getEventsBySession(sessionId);
+  @Roles('teacher')
+  getEventsBySession(
+    @Param('sessionId') sessionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.monitoringService.getEventsBySession(sessionId, user);
   }
 
   @Get('events/exam/:examId/live')
-  getLiveFeed(@Param('examId') examId: string) {
-    return this.monitoringService.getLiveFeed(examId);
+  @Roles('teacher')
+  getLiveFeed(
+    @Param('examId') examId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.monitoringService.getLiveFeed(examId, user);
   }
 
   @Get('dashboard')
-  getDashboardStats() {
-    return this.monitoringService.getDashboardStats();
+  @Roles('teacher')
+  getDashboardStats(@CurrentUser() user: AuthenticatedUser) {
+    return this.monitoringService.getDashboardStats(user);
   }
 }
