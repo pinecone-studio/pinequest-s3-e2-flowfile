@@ -5,16 +5,25 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 
-import { NewExam, ExamStatus } from 'src/shared/types/exam.types';
+import type { NewExam, ExamStatus } from 'src/shared/types/exam.types';
+import type {
+  AssignedExamSummary,
+  Session,
+} from 'src/shared/types/session.types';
 import { ExamRepository } from './exam.repository';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { QuestionRepository } from '../question/question.repository';
+import { EnrollmentRepository } from '../enrollment/enrollment.repository';
+import { SessionRepository } from '../session/session.repository';
+import { getSessionTiming } from 'src/shared/utils/exam-session';
 
 @Injectable()
 export class ExamService {
   constructor(
     private readonly examRepo: ExamRepository,
     private readonly questionRepo: QuestionRepository,
+    private readonly enrollmentRepo: EnrollmentRepository,
+    private readonly sessionRepo: SessionRepository,
   ) {}
 
   async getAllExams() {
@@ -33,6 +42,53 @@ export class ExamService {
 
   async getExamsByTeacher(teacherId: string) {
     return this.examRepo.findExamsByTeacher(teacherId);
+  }
+
+  async getAssignedExams(studentId: string): Promise<AssignedExamSummary[]> {
+    const enrollments =
+      await this.enrollmentRepo.findEnrollmentsByStudent(studentId);
+
+    if (enrollments.length === 0) {
+      return [];
+    }
+
+    const [exams, sessions] = await Promise.all([
+      this.examRepo.findExamsByIds(
+        enrollments.map((enrollment) => enrollment.examId),
+      ),
+      this.sessionRepo.findSessionsByStudent(studentId),
+    ]);
+
+    const examById = new Map(exams.map((exam) => [exam.id, exam]));
+    const latestSessionByExam = new Map<string, Session>();
+
+    for (const session of sessions) {
+      if (!latestSessionByExam.has(session.examId)) {
+        latestSessionByExam.set(session.examId, session);
+      }
+    }
+
+    const summaries: AssignedExamSummary[] = [];
+
+    for (const enrollment of enrollments) {
+      const exam = examById.get(enrollment.examId);
+
+      if (!exam) {
+        continue;
+      }
+
+      const session = latestSessionByExam.get(enrollment.examId) ?? null;
+
+      summaries.push({
+        exam,
+        session,
+        enrolledAt: enrollment.assignedAt,
+        attemptStatus: this.getAssignedExamStatus(exam, session),
+        timing: session?.startedAt ? getSessionTiming(exam, session) : null,
+      });
+    }
+
+    return summaries;
   }
 
   async createExam(teacherId: string, dto: CreateExamDto) {
@@ -107,7 +163,10 @@ export class ExamService {
     return this.examRepo.deleteExam(id);
   }
 
-  private validateExamSchedule(startsAt?: string | null, endsAt?: string | null) {
+  private validateExamSchedule(
+    startsAt?: string | null,
+    endsAt?: string | null,
+  ) {
     if (!startsAt || !endsAt) {
       return;
     }
@@ -133,5 +192,46 @@ export class ExamService {
         `Cannot change exam status from ${currentStatus} to ${nextStatus}`,
       );
     }
+  }
+
+  private getAssignedExamStatus(
+    exam: {
+      status: ExamStatus;
+      startsAt: string | null;
+      endsAt: string | null;
+    },
+    session: Session | null,
+  ): AssignedExamSummary['attemptStatus'] {
+    if (session?.status === 'submitted') {
+      return 'submitted';
+    }
+
+    if (session?.status === 'force_submitted') {
+      return 'force_submitted';
+    }
+
+    if (session?.status === 'in_progress') {
+      return 'in_progress';
+    }
+
+    const now = new Date();
+
+    if (exam.status === 'closed') {
+      return 'closed';
+    }
+
+    if (exam.startsAt && now < new Date(exam.startsAt)) {
+      return 'upcoming';
+    }
+
+    if (exam.endsAt && now > new Date(exam.endsAt)) {
+      return 'closed';
+    }
+
+    if (exam.status === 'scheduled' || exam.status === 'published') {
+      return 'ready';
+    }
+
+    return 'closed';
   }
 }
