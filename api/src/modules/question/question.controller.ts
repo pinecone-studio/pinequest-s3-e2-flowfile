@@ -48,12 +48,15 @@ export class QuestionController {
     @Body() body: CreateQuestionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.questionService.createQuestion({
-      ...body,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }, user.id);
+    return this.questionService.createQuestion(
+      {
+        ...body,
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      user.id,
+    );
   }
 
   @Patch(':id')
@@ -68,7 +71,10 @@ export class QuestionController {
 
   @Delete(':id')
   @Roles('teacher')
-  deleteQuestion(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  deleteQuestion(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.questionService.deleteQuestion(id, user.id);
   }
 
@@ -79,7 +85,11 @@ export class QuestionController {
     @Body() body: ReorderQuestionsDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.questionService.reorderQuestions(examId, body.orderedIds, user.id);
+    return this.questionService.reorderQuestions(
+      examId,
+      body.orderedIds,
+      user.id,
+    );
   }
 
   @Patch(':id/options/reorder')

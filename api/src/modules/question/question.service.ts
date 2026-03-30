@@ -5,10 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { QuestionRepository } from './question.repository';
-import { NewQuestion, UpdateQuestion } from 'src/shared/types';
+import type {
+  NewQuestion,
+  Question,
+  StudentQuestion,
+  UpdateQuestion,
+} from 'src/shared/types/question.types';
 import type { AuthenticatedUser } from 'src/modules/auth/interfaces/authenticated-user.interface';
 import { ExamRepository } from '../exam/exam.repository';
 import { EnrollmentRepository } from '../enrollment/enrollment.repository';
+import type { Exam } from 'src/shared/types/exam.types';
 
 @Injectable()
 export class QuestionService {
@@ -17,19 +23,36 @@ export class QuestionService {
     private readonly examRepo: ExamRepository,
     private readonly enrollmentRepo: EnrollmentRepository,
   ) {}
-  async getQuestionsByExam(examId: string, user?: AuthenticatedUser) {
+  async getQuestionsByExam(
+    examId: string,
+    user?: AuthenticatedUser,
+  ): Promise<Question[] | StudentQuestion[]> {
+    let shouldSanitizeForStudent = false;
+
     if (user) {
       await this.ensureExamAccess(examId, user);
+      shouldSanitizeForStudent = user.role === 'student';
     }
 
-    return this.questionRepo.findQuestionsByExam(examId);
+    const questions = await this.questionRepo.findQuestionsByExam(examId);
+
+    return shouldSanitizeForStudent
+      ? questions.map((question) => this.sanitizeQuestionForStudent(question))
+      : questions;
   }
-  async getQuestionById(id: string, user?: AuthenticatedUser) {
+  async getQuestionById(
+    id: string,
+    user?: AuthenticatedUser,
+  ): Promise<Question | StudentQuestion> {
     const question = await this.questionRepo.findQuestionById(id);
     if (!question) throw new NotFoundException('Question not found');
 
     if (user) {
       await this.ensureExamAccess(question.examId, user);
+
+      if (user.role === 'student') {
+        return this.sanitizeQuestionForStudent(question);
+      }
     }
 
     return question;
@@ -46,9 +69,14 @@ export class QuestionService {
     await this.getQuestionForTeacher(id, teacherId);
     return this.questionRepo.deleteQuestion(id);
   }
-  async reorderQuestions(examId: string, orderedIds: string[], teacherId: string) {
+  async reorderQuestions(
+    examId: string,
+    orderedIds: string[],
+    teacherId: string,
+  ) {
     await this.ensureTeacherCanManageExam(examId, teacherId);
-    const existingQuestions = await this.questionRepo.findQuestionsByExam(examId);
+    const existingQuestions =
+      await this.questionRepo.findQuestionsByExam(examId);
 
     if (existingQuestions.length !== orderedIds.length) {
       throw new BadRequestException(
@@ -56,21 +84,32 @@ export class QuestionService {
       );
     }
 
-    const existingIds = new Set(existingQuestions.map((question) => question.id));
+    const existingIds = new Set(
+      existingQuestions.map((question) => question.id),
+    );
     const hasUnknownIds = orderedIds.some((id) => !existingIds.has(id));
 
     if (hasUnknownIds) {
-      throw new BadRequestException('Question reorder payload contains invalid ids');
+      throw new BadRequestException(
+        'Question reorder payload contains invalid ids',
+      );
     }
 
     return this.questionRepo.reorderQuestions(examId, orderedIds);
   }
-  async reorderOptions(id: string, orderedOptions: string[], teacherId: string) {
+  async reorderOptions(
+    id: string,
+    orderedOptions: string[],
+    teacherId: string,
+  ) {
     await this.getQuestionForTeacher(id, teacherId);
     return this.questionRepo.reorderOptions(id, orderedOptions);
   }
 
-  private async getQuestionForTeacher(id: string, teacherId: string) {
+  private async getQuestionForTeacher(
+    id: string,
+    teacherId: string,
+  ): Promise<Question> {
     const question = await this.questionRepo.findQuestionById(id);
 
     if (!question) {
@@ -82,7 +121,10 @@ export class QuestionService {
     return question;
   }
 
-  private async ensureExamAccess(examId: string, user: AuthenticatedUser) {
+  private async ensureExamAccess(
+    examId: string,
+    user: AuthenticatedUser,
+  ): Promise<Exam> {
     const exam = await this.examRepo.findExamById(examId);
 
     if (!exam) {
@@ -91,14 +133,22 @@ export class QuestionService {
 
     if (user.role === 'teacher') {
       if (exam.teacherId !== user.id) {
-        throw new ForbiddenException('You cannot access questions for this exam');
+        throw new ForbiddenException(
+          'You cannot access questions for this exam',
+        );
       }
 
       return exam;
     }
 
-    const enrollments = await this.enrollmentRepo.findEnrollmentsByStudent(user.id);
-    const isEnrolled = enrollments.some((enrollment) => enrollment.examId === examId);
+    this.ensureExamIsAvailableToStudent(exam);
+
+    const enrollments = await this.enrollmentRepo.findEnrollmentsByStudent(
+      user.id,
+    );
+    const isEnrolled = enrollments.some(
+      (enrollment) => enrollment.examId === examId,
+    );
 
     if (!isEnrolled) {
       throw new ForbiddenException('You are not enrolled in this exam');
@@ -107,7 +157,37 @@ export class QuestionService {
     return exam;
   }
 
-  private async ensureTeacherCanManageExam(examId: string, teacherId: string) {
+  private ensureExamIsAvailableToStudent(exam: {
+    status: string;
+    startsAt: string | null;
+    endsAt: string | null;
+  }) {
+    if (exam.status !== 'scheduled' && exam.status !== 'published') {
+      throw new BadRequestException('This exam is not available yet');
+    }
+
+    const now = new Date();
+
+    if (exam.startsAt && now < new Date(exam.startsAt)) {
+      throw new BadRequestException('This exam has not started yet');
+    }
+
+    if (exam.endsAt && now > new Date(exam.endsAt)) {
+      throw new BadRequestException('This exam is already closed');
+    }
+  }
+
+  private sanitizeQuestionForStudent(question: Question): StudentQuestion {
+    return {
+      ...question,
+      correctAnswer: null,
+    };
+  }
+
+  private async ensureTeacherCanManageExam(
+    examId: string,
+    teacherId: string,
+  ): Promise<Exam> {
     const exam = await this.examRepo.findExamById(examId);
 
     if (!exam) {

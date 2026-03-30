@@ -1,18 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { asc, eq } from 'drizzle-orm';
 import { db } from 'src/database/client';
-import { questions } from 'src/database/schema';
-import { NewQuestion, UpdateQuestion } from 'src/shared/types';
+import { questions } from 'src/database/schema/questions.schema';
+import type {
+  NewQuestion,
+  Question,
+  UpdateQuestion,
+} from 'src/shared/types/question.types';
 
 @Injectable()
 export class QuestionRepository {
-  async findQuestionsByExam(examId: string) {
+  async findQuestionsByExam(examId: string): Promise<Question[]> {
     return db.query.questions.findMany({
       where: eq(questions.examId, examId),
       orderBy: asc(questions.orderIndex),
     });
   }
-  async findQuestionById(id: string) {
+  async findQuestionById(id: string): Promise<Question | undefined> {
     return db.query.questions.findFirst({ where: eq(questions.id, id) });
   }
   async createQuestion(data: NewQuestion) {
