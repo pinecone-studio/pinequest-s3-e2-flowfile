@@ -1,8 +1,11 @@
 import { InferSelectModel, InferInsertModel } from 'drizzle-orm';
-import { questions } from 'src/database/schema';
+import { questions } from 'src/database/schema/questions.schema';
 
 export type Question = InferSelectModel<typeof questions>;
 export type NewQuestion = InferInsertModel<typeof questions>;
+export type StudentQuestion = Omit<Question, 'correctAnswer'> & {
+  correctAnswer: null;
+};
 export type UpdateQuestion = Partial<
   Omit<NewQuestion, 'id' | 'examId' | 'createdAt'>
 >;
