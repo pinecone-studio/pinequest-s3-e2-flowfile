@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { MonitoringService } from './monitoring.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { ClerkAuthGuard } from 'src/modules/auth/guards/clerk-auth.guard';
@@ -21,7 +14,10 @@ export class MonitoringController {
 
   @Post('events')
   @Roles('student')
-  logEvent(@Body() body: CreateEventDto, @CurrentUser() user: AuthenticatedUser) {
+  logEvent(
+    @Body() body: CreateEventDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.monitoringService.logEvent(body, user);
   }
 
