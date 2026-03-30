@@ -1,32 +1,45 @@
 import { Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { db } from 'src/database/client';
-import { exams } from 'src/database/schema';
-import type { ExamStatus, NewExam } from 'src/shared/types';
+import { exams } from 'src/database/schema/exams.schema';
+import type { Exam, ExamStatus, NewExam } from 'src/shared/types/exam.types';
 
 @Injectable()
 export class ExamRepository {
-  async findAllExams(filters?: { status?: ExamStatus }) {
+  async findAllExams(filters?: { status?: ExamStatus }): Promise<Exam[]> {
     return db.query.exams.findMany({
       where: filters?.status ? eq(exams.status, filters.status) : undefined,
     });
   }
 
-  async findExamById(id: string) {
+  async findExamById(id: string): Promise<Exam | undefined> {
     return db.query.exams.findFirst({
       where: eq(exams.id, id),
     });
   }
 
-  async findExamByIdAndTeacherId(id: string, teacherId: string) {
+  async findExamByIdAndTeacherId(
+    id: string,
+    teacherId: string,
+  ): Promise<Exam | undefined> {
     return db.query.exams.findFirst({
       where: and(eq(exams.id, id), eq(exams.teacherId, teacherId)),
     });
   }
 
-  async findExamsByTeacher(teacherId: string) {
+  async findExamsByTeacher(teacherId: string): Promise<Exam[]> {
     return db.query.exams.findMany({
       where: eq(exams.teacherId, teacherId),
+    });
+  }
+
+  async findExamsByIds(ids: string[]): Promise<Exam[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    return db.query.exams.findMany({
+      where: inArray(exams.id, ids),
     });
   }
 

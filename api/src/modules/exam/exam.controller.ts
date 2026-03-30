@@ -23,6 +23,12 @@ import type { AuthenticatedUser } from 'src/modules/auth/interfaces/authenticate
 export class ExamController {
   constructor(private readonly examService: ExamService) {}
 
+  @Get('assigned/me')
+  @Roles('student')
+  getAssignedExams(@CurrentUser() user: AuthenticatedUser) {
+    return this.examService.getAssignedExams(user.id);
+  }
+
   @Get()
   getMyExams(@CurrentUser() user: AuthenticatedUser) {
     return this.examService.getMyExams(user.id);
