@@ -6,10 +6,12 @@ import {
 } from '@nestjs/common';
 import { AnswerRepository } from './answer.repository';
 import { SessionRepository } from '../session/session.repository';
-import type { NewAnswer } from 'src/shared/types';
+import type { NewAnswer } from 'src/shared/types/answer.types';
 import type { AuthenticatedUser } from 'src/modules/auth/interfaces/authenticated-user.interface';
 import { QuestionRepository } from '../question/question.repository';
 import { ExamRepository } from '../exam/exam.repository';
+import { SessionService } from '../session/session.service';
+import { getSessionTiming } from 'src/shared/utils/exam-session';
 
 @Injectable()
 export class AnswerService {
@@ -18,6 +20,7 @@ export class AnswerService {
     private readonly sessionRepo: SessionRepository,
     private readonly questionRepo: QuestionRepository,
     private readonly examRepo: ExamRepository,
+    private readonly sessionService: SessionService,
   ) {}
 
   async getAnswersBySession(sessionId: string, user: AuthenticatedUser) {
@@ -25,13 +28,16 @@ export class AnswerService {
     return this.answerRepo.findAnswersBySession(sessionId);
   }
 
-  async autosaveAnswer(data: {
-    sessionId: string;
-    questionId: string;
-    textAnswer?: string;
-    formulaAnswerJson?: string;
-    fileUrl?: string;
-  }, user: AuthenticatedUser) {
+  async autosaveAnswer(
+    data: {
+      sessionId: string;
+      questionId: string;
+      textAnswer?: string;
+      formulaAnswerJson?: string;
+      fileUrl?: string;
+    },
+    user: AuthenticatedUser,
+  ) {
     const session = await this.ensureSessionAccess(data.sessionId, user, true);
     const question = await this.questionRepo.findQuestionById(data.questionId);
 
@@ -40,7 +46,9 @@ export class AnswerService {
     }
 
     if (question.examId !== session.examId) {
-      throw new BadRequestException('Question does not belong to this session exam');
+      throw new BadRequestException(
+        'Question does not belong to this session exam',
+      );
     }
 
     const now = new Date().toISOString();
@@ -79,7 +87,9 @@ export class AnswerService {
       const exam = await this.examRepo.findExamById(session.examId);
 
       if (!exam || exam.teacherId !== user.id) {
-        throw new ForbiddenException('You cannot access answers for this session');
+        throw new ForbiddenException(
+          'You cannot access answers for this session',
+        );
       }
 
       if (requireWritable) {
@@ -95,11 +105,29 @@ export class AnswerService {
 
     if (requireWritable) {
       if (session.status !== 'in_progress') {
-        throw new BadRequestException('Answers can only be changed during an active session');
+        throw new BadRequestException(
+          'Answers can only be changed during an active session',
+        );
       }
 
       if (session.submittedAt) {
         throw new BadRequestException('Submitted sessions cannot be changed');
+      }
+
+      const exam = await this.examRepo.findExamById(session.examId);
+
+      if (!exam) {
+        throw new NotFoundException('Exam not found');
+      }
+
+      const timing = getSessionTiming(exam, session);
+
+      if (timing.isExpired) {
+        await this.sessionService.forceSubmitSession(
+          session.id,
+          'time_expired',
+        );
+        throw new BadRequestException('Session time has expired');
       }
     }
 
