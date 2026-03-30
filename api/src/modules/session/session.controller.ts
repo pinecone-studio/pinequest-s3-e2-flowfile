@@ -36,7 +36,11 @@ export class SessionController {
     @Param('examId') examId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.sessionService.getSessionByStudentAndExam(studentId, examId, user);
+    return this.sessionService.getSessionByStudentAndExam(
+      studentId,
+      examId,
+      user,
+    );
   }
 
   @Post('start')
@@ -48,9 +52,30 @@ export class SessionController {
     return this.sessionService.startSession(body.studentId, body.examId, user);
   }
 
+  @Post('exam/:examId/start')
+  @Roles('student')
+  startMySession(
+    @Param('examId') examId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.sessionService.startSession(user.id, examId, user);
+  }
+
+  @Get(':id/attempt')
+  @Roles('student')
+  getMyAttempt(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.sessionService.getAttempt(id, user);
+  }
+
   @Patch(':id/submit')
   @Roles('student')
-  submitSession(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  submitSession(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.sessionService.submitSession(id, user);
   }
 

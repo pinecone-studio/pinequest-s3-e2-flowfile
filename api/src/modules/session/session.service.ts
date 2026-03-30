@@ -6,9 +6,26 @@ import {
 } from '@nestjs/common';
 import { SessionRepository } from './session.repository';
 import { ExamRepository } from '../exam/exam.repository';
-import type { NewSession, SessionStatus } from 'src/shared/types';
+import type {
+  NewSession,
+  Session,
+  SessionAttempt,
+  SessionStatus,
+} from 'src/shared/types/session.types';
+import type { Exam } from 'src/shared/types/exam.types';
+import type {
+  Question,
+  StudentQuestion,
+} from 'src/shared/types/question.types';
 import type { AuthenticatedUser } from 'src/modules/auth/interfaces/authenticated-user.interface';
 import { EnrollmentRepository } from '../enrollment/enrollment.repository';
+import { QuestionRepository } from '../question/question.repository';
+import { AnswerRepository } from '../answer/answer.repository';
+import { NotificationService } from '../notification/notification.service';
+import {
+  getSessionTiming,
+  isAnswerProvided,
+} from 'src/shared/utils/exam-session';
 
 @Injectable()
 export class SessionService {
@@ -16,6 +33,9 @@ export class SessionService {
     private readonly sessionRepo: SessionRepository,
     private readonly examRepo: ExamRepository,
     private readonly enrollmentRepo: EnrollmentRepository,
+    private readonly questionRepo: QuestionRepository,
+    private readonly answerRepo: AnswerRepository,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async getSessionByStudentAndExam(
@@ -36,6 +56,11 @@ export class SessionService {
       throw new NotFoundException('Session not found');
     }
 
+    if (user?.role === 'student') {
+      const exam = await this.getExamOrThrow(examId);
+      return this.syncExpiredSessionIfNeeded(session, exam);
+    }
+
     return session;
   }
 
@@ -54,48 +79,44 @@ export class SessionService {
   ) {
     this.ensureStudentOwnsResource(user, studentId);
 
-    const exam = await this.examRepo.findExamById(examId);
-
-    if (!exam) {
-      throw new NotFoundException('Exam not found');
-    }
-
-    if (exam.status !== 'scheduled' && exam.status !== 'published') {
-      throw new BadRequestException('This exam is not available to start');
-    }
-
-    const nowDate = new Date();
-
-    if (exam.startsAt && nowDate < new Date(exam.startsAt)) {
-      throw new BadRequestException('This exam has not started yet');
-    }
-
-    if (exam.endsAt && nowDate > new Date(exam.endsAt)) {
-      throw new BadRequestException('This exam is already closed');
-    }
-
-    const enrollments = await this.enrollmentRepo.findEnrollmentsByStudent(studentId);
-    const isEnrolled = enrollments.some((enrollment) => enrollment.examId === examId);
-
-    if (!isEnrolled) {
-      throw new ForbiddenException('You are not enrolled in this exam');
-    }
+    const exam = await this.getExamOrThrow(examId);
+    this.ensureExamCanBeStarted(exam);
+    await this.ensureStudentIsEnrolled(studentId, examId);
 
     const existingSession = await this.sessionRepo.findSessionByStudentAndExam(
       studentId,
       examId,
     );
 
-    if (existingSession?.status === 'submitted' || existingSession?.status === 'force_submitted') {
+    if (
+      existingSession?.status === 'submitted' ||
+      existingSession?.status === 'force_submitted'
+    ) {
       throw new BadRequestException('Session already submitted');
     }
 
     if (existingSession) {
       if (existingSession.status === 'in_progress') {
-        return existingSession;
+        const syncedSession = await this.syncExpiredSessionIfNeeded(
+          existingSession,
+          exam,
+        );
+
+        if (syncedSession.status !== 'in_progress') {
+          throw new BadRequestException('Session time has expired');
+        }
+
+        return syncedSession;
       }
 
-      return this.sessionRepo.updateSessionStatus(existingSession.id, 'in_progress');
+      const resumedSession = await this.sessionRepo.updateSessionStatus(
+        existingSession.id,
+        'in_progress',
+      );
+
+      await this.notifyExamStarted(exam, resumedSession);
+
+      return resumedSession;
     }
 
     const now = new Date().toISOString();
@@ -112,23 +133,56 @@ export class SessionService {
       updatedAt: now,
     };
 
-    return this.sessionRepo.createSession(data);
+    const session = await this.sessionRepo.createSession(data);
+
+    await this.notifyExamStarted(exam, session);
+
+    return session;
+  }
+
+  async getAttempt(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<SessionAttempt> {
+    const session = await this.getSessionOrThrow(id);
+
+    this.ensureStudentOwnsResource(user, session.studentId);
+
+    const exam = await this.getExamOrThrow(session.examId);
+    const syncedSession = await this.syncExpiredSessionIfNeeded(session, exam);
+
+    const [questions, answers] = await Promise.all([
+      this.questionRepo.findQuestionsByExam(session.examId),
+      this.answerRepo.findAnswersBySession(id),
+    ]);
+
+    return {
+      exam,
+      session: syncedSession,
+      questions: questions.map((question) =>
+        this.sanitizeQuestionForStudent(question),
+      ),
+      answers,
+      timing: getSessionTiming(exam, syncedSession),
+    };
   }
 
   async submitSession(
     id: string,
     user: AuthenticatedUser,
-    status: Extract<SessionStatus, 'submitted' | 'force_submitted'> = 'submitted',
+    status: Extract<
+      SessionStatus,
+      'submitted' | 'force_submitted'
+    > = 'submitted',
   ) {
-    const session = await this.sessionRepo.findSessionById(id);
-
-    if (!session) {
-      throw new NotFoundException('Session not found');
-    }
+    const session = await this.getSessionOrThrow(id);
 
     this.ensureStudentOwnsResource(user, session.studentId);
 
-    if (session.status === 'submitted' || session.status === 'force_submitted') {
+    if (
+      session.status === 'submitted' ||
+      session.status === 'force_submitted'
+    ) {
       return session;
     }
 
@@ -136,7 +190,24 @@ export class SessionService {
       throw new BadRequestException('Only active sessions can be submitted');
     }
 
-    return this.sessionRepo.submitSession(id, status);
+    const exam = await this.getExamOrThrow(session.examId);
+    const timing = getSessionTiming(exam, session);
+    const resolvedStatus = timing.isExpired ? 'force_submitted' : status;
+
+    if (resolvedStatus === 'submitted') {
+      await this.ensureRequiredAnswersCompleted(session.id, session.examId);
+    }
+
+    await this.answerRepo.finalizeAnswers(id);
+
+    const submittedSession = await this.sessionRepo.submitSession(
+      id,
+      resolvedStatus,
+    );
+
+    await this.notifyExamSubmitted(exam, submittedSession, resolvedStatus);
+
+    return submittedSession;
   }
 
   async flagSession(id: string, user: AuthenticatedUser) {
@@ -153,6 +224,38 @@ export class SessionService {
     }
 
     return this.sessionRepo.flagSession(id);
+  }
+
+  async forceSubmitSession(
+    id: string,
+    reason: 'time_expired' | 'tab_limit_exceeded',
+  ) {
+    const session = await this.getSessionOrThrow(id);
+
+    if (
+      session.status === 'submitted' ||
+      session.status === 'force_submitted'
+    ) {
+      return session;
+    }
+
+    const exam = await this.getExamOrThrow(session.examId);
+
+    await this.answerRepo.finalizeAnswers(id);
+
+    const submittedSession = await this.sessionRepo.submitSession(
+      id,
+      'force_submitted',
+    );
+
+    await this.notifyExamSubmitted(
+      exam,
+      submittedSession,
+      'force_submitted',
+      reason,
+    );
+
+    return submittedSession;
   }
 
   private async ensureSessionAccessByExam(
@@ -182,7 +285,147 @@ export class SessionService {
     return exam;
   }
 
-  private ensureStudentOwnsResource(user: AuthenticatedUser, studentId: string) {
+  private async getExamOrThrow(examId: string) {
+    const exam = await this.examRepo.findExamById(examId);
+
+    if (!exam) {
+      throw new NotFoundException('Exam not found');
+    }
+
+    return exam;
+  }
+
+  private async getSessionOrThrow(id: string) {
+    const session = await this.sessionRepo.findSessionById(id);
+
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+
+    return session;
+  }
+
+  private ensureExamCanBeStarted(exam: {
+    status: string;
+    startsAt: string | null;
+    endsAt: string | null;
+  }) {
+    if (exam.status !== 'scheduled' && exam.status !== 'published') {
+      throw new BadRequestException('This exam is not available to start');
+    }
+
+    const now = new Date();
+
+    if (exam.startsAt && now < new Date(exam.startsAt)) {
+      throw new BadRequestException('This exam has not started yet');
+    }
+
+    if (exam.endsAt && now > new Date(exam.endsAt)) {
+      throw new BadRequestException('This exam is already closed');
+    }
+  }
+
+  private async ensureStudentIsEnrolled(studentId: string, examId: string) {
+    const enrollments =
+      await this.enrollmentRepo.findEnrollmentsByStudent(studentId);
+    const isEnrolled = enrollments.some(
+      (enrollment) => enrollment.examId === examId,
+    );
+
+    if (!isEnrolled) {
+      throw new ForbiddenException('You are not enrolled in this exam');
+    }
+  }
+
+  private async ensureRequiredAnswersCompleted(
+    sessionId: string,
+    examId: string,
+  ) {
+    const [questions, answers] = await Promise.all([
+      this.questionRepo.findQuestionsByExam(examId),
+      this.answerRepo.findAnswersBySession(sessionId),
+    ]);
+    const answersByQuestionId = new Map(
+      answers.map((answer) => [answer.questionId, answer]),
+    );
+    const missingQuestionIds = questions
+      .filter(
+        (question) =>
+          question.isRequired &&
+          !isAnswerProvided(answersByQuestionId.get(question.id)),
+      )
+      .map((question) => question.id);
+
+    if (missingQuestionIds.length > 0) {
+      throw new BadRequestException({
+        message: 'Please answer every required question before submitting',
+        missingQuestionIds,
+      });
+    }
+  }
+
+  private async syncExpiredSessionIfNeeded(
+    session: Session,
+    exam: Exam,
+  ): Promise<Session> {
+    if (session.status !== 'in_progress') {
+      return session;
+    }
+
+    const timing = getSessionTiming(exam, session);
+
+    if (!timing.isExpired) {
+      return session;
+    }
+
+    return this.forceSubmitSession(session.id, 'time_expired');
+  }
+
+  private async notifyExamStarted(exam: Exam, session: Session) {
+    await this.notificationService.createNotification({
+      recipientId: exam.teacherId,
+      examId: exam.id,
+      sessionId: session.id,
+      title: 'Exam started',
+      body: `Student ${session.studentId} started "${exam.title}".`,
+      type: 'exam_started',
+    });
+  }
+
+  private async notifyExamSubmitted(
+    exam: Exam,
+    session: Session,
+    status: Extract<SessionStatus, 'submitted' | 'force_submitted'>,
+    reason?: 'time_expired' | 'tab_limit_exceeded',
+  ) {
+    const title =
+      status === 'force_submitted' ? 'Exam auto-submitted' : 'Exam submitted';
+    const body =
+      status === 'force_submitted'
+        ? `Student ${session.studentId} was auto-submitted for "${exam.title}"${reason ? ` because ${reason.replaceAll('_', ' ')}` : ''}.`
+        : `Student ${session.studentId} submitted "${exam.title}".`;
+
+    await this.notificationService.createNotification({
+      recipientId: exam.teacherId,
+      examId: exam.id,
+      sessionId: session.id,
+      title,
+      body,
+      type: 'exam_submitted',
+    });
+  }
+
+  private sanitizeQuestionForStudent(question: Question): StudentQuestion {
+    return {
+      ...question,
+      correctAnswer: null,
+    };
+  }
+
+  private ensureStudentOwnsResource(
+    user: AuthenticatedUser,
+    studentId: string,
+  ) {
     if (user.role !== 'student' || user.id !== studentId) {
       throw new ForbiddenException('You cannot access this student session');
     }

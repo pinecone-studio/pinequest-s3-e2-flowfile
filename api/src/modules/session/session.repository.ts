@@ -1,12 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from 'src/database/client';
-import { examSessions } from 'src/database/schema';
-import type { NewSession, SessionStatus } from 'src/shared/types';
+import { examSessions } from 'src/database/schema/sessions.schema';
+import type {
+  NewSession,
+  Session,
+  SessionStatus,
+} from 'src/shared/types/session.types';
 
 @Injectable()
 export class SessionRepository {
-  async findSessionByStudentAndExam(studentId: string, examId: string) {
+  async findSessionByStudentAndExam(
+    studentId: string,
+    examId: string,
+  ): Promise<Session | undefined> {
     return db.query.examSessions.findFirst({
       where: and(
         eq(examSessions.studentId, studentId),
@@ -15,15 +22,22 @@ export class SessionRepository {
     });
   }
 
-  async findSessionById(id: string) {
+  async findSessionById(id: string): Promise<Session | undefined> {
     return db.query.examSessions.findFirst({
       where: eq(examSessions.id, id),
     });
   }
 
-  async findSessionsByExam(examId: string) {
+  async findSessionsByExam(examId: string): Promise<Session[]> {
     return db.query.examSessions.findMany({
       where: eq(examSessions.examId, examId),
+      orderBy: desc(examSessions.createdAt),
+    });
+  }
+
+  async findSessionsByStudent(studentId: string): Promise<Session[]> {
+    return db.query.examSessions.findMany({
+      where: eq(examSessions.studentId, studentId),
       orderBy: desc(examSessions.createdAt),
     });
   }
@@ -61,7 +75,13 @@ export class SessionRepository {
     return session;
   }
 
-  async submitSession(id: string, status: Extract<SessionStatus, 'submitted' | 'force_submitted'> = 'submitted') {
+  async submitSession(
+    id: string,
+    status: Extract<
+      SessionStatus,
+      'submitted' | 'force_submitted'
+    > = 'submitted',
+  ) {
     const now = new Date().toISOString();
     const [session] = await db
       .update(examSessions)
