@@ -12,6 +12,15 @@ import { QuestionRepository } from '../question/question.repository';
 import { ExamRepository } from '../exam/exam.repository';
 import { SessionService } from '../session/session.service';
 import { getSessionTiming } from 'src/shared/utils/exam-session';
+import { UploadAnswerAssetDto } from './dto/upload-answer-asset.dto';
+import type { Request } from 'express';
+
+type UploadedAnswerFile = {
+  filename: string;
+  originalname: string;
+  mimetype: string;
+  size: number;
+};
 
 @Injectable()
 export class AnswerService {
@@ -70,6 +79,40 @@ export class AnswerService {
   async finalizeAnswers(sessionId: string, user: AuthenticatedUser) {
     await this.ensureSessionAccess(sessionId, user, true);
     return this.answerRepo.finalizeAnswers(sessionId);
+  }
+
+  uploadAnswerAsset(
+    file: UploadedAnswerFile | undefined,
+    body: UploadAnswerAssetDto,
+    user: AuthenticatedUser,
+    request: Request,
+  ) {
+    if (user.role !== 'student') {
+      throw new ForbiddenException('Only students can upload answer files');
+    }
+
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    const forwardedProto =
+      (request.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0] ??
+      request.protocol;
+    const forwardedHost =
+      (request.headers['x-forwarded-host'] as string | undefined)?.split(',')[0] ??
+      request.get('host');
+
+    if (!forwardedHost) {
+      throw new BadRequestException('Host header is missing');
+    }
+
+    return {
+      url: `${forwardedProto}://${forwardedHost}/uploads/answers/${file.filename}`,
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      kind: body.kind ?? null,
+    };
   }
 
   private async ensureSessionAccess(
