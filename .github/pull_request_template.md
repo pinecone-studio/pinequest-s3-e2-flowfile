@@ -1,25 +1,25 @@
-## Summary
+## What
 
-Short description of the change.
+[Briefly describe what this PR introduces or changes.]
 
-## Problem
+## Why
 
-What problem does this PR solve?
+[Explain the reason for this change and the problem it solves.]
 
 ## Changes
 
-* Change 1
-* Change 2
-* Change 3
+- [Primary change]
+- [Secondary change]
+- [Additional change]
 
-## How to Test
+## How to test
 
-Steps to verify the change:
+1. [Go to route / page / feature]
+2. [Perform action]
+3. [Verify expected result]
 
-1.
-2.
-3.
+## Notes
 
-## Issue
+[Optional implementation details, context, limitations, or follow-up info.]
 
-Closes #issue-number
+Closes #[issue-number]
