@@ -18,6 +18,7 @@ import {
   ReportsOverviewResolver,
   TeacherExamDetailResolver,
 } from 'src/graphql/resolvers';
+import { OfflineExamSyncModule } from 'src/modules/offline-exam-sync/offline-exam-sync.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import {
     AnswerModule,
     MonitoringModule,
     NotificationModule,
+    OfflineExamSyncModule,
   ],
   controllers: [AppController],
   providers: [
