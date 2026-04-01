@@ -10,6 +10,9 @@ export type ImportApiResponse = { questions?: ImportedQuestionPayload[]; parser?
 
 export const stepLabels = ['Эх сурвалж', 'Ерөнхий мэдээлэл', 'Асуултууд', 'Хуваарь']
 const MANUAL_QUESTION_TYPES: QuestionType[] = ['short', 'long', 'formula', 'code']
+const parseExamApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+  ? new URL('/parse-exam', process.env.NEXT_PUBLIC_API_BASE_URL).toString()
+  : ''
 
 export function isManualQuestionType(type: QuestionType) { return MANUAL_QUESTION_TYPES.includes(type) }
 export function getCourseLabel(course: Course) {
@@ -35,13 +38,14 @@ export function mapImportedQuestions(items: ImportedQuestionPayload[], existingC
 }
 
 export async function processImportFiles(files: File[], title: string, courseLabel: string) {
+  if (!parseExamApiUrl) throw new Error('NEXT_PUBLIC_API_BASE_URL is not configured.')
   const collected: ImportedQuestionPayload[] = []; const skipped: string[] = []; let usedLocalParser = false
   for (const file of files) {
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
     const isBinary = ['docx', 'pdf'].includes(ext)
     const fileText = isBinary ? '' : await file.text()
     const fileBuffer = isBinary ? arrayBufferToBase64(await file.arrayBuffer()) : undefined
-    const res = await fetch('/api/parse-exam-file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileText, fileBuffer, fileType: file.type, fileName: file.name, title, courseLabel }) })
+    const res = await fetch(parseExamApiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileText, fileBuffer, fileType: file.type, fileName: file.name, title, courseLabel }) })
     const payload = await res.json() as ImportApiResponse
     if (!res.ok) { skipped.push(file.name); continue }
     if (payload.parser === 'local') usedLocalParser = true
