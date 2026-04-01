@@ -6,3 +6,4 @@ export * from './suspiciousEvents.schema';
 export * from './notifications.schema';
 export * from './proctoring-violations.schema';
 export * from './code-challanges.schema';
+export * from './offline-exam-sync.schema';
