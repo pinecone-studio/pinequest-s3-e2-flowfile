@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import * as vm from 'node:vm';
 import type { ParsedCodeRunnerTestCase } from 'src/shared/types/code-runner.types';
 
+const SCRIPT_TIMEOUT_MS = 1000;
+const FUNCTION_LOOKUP_TIMEOUT_MS = 100;
+const TEST_ARGS_KEY = '__codeRunnerArgs__';
+
 type PreviewResult = {
   ok: boolean;
   logs: string[];
@@ -29,7 +33,7 @@ type TestRunResult = {
 
 @Injectable()
 export class JavaScriptRunnerService {
-  async preview(code: string): Promise<PreviewResult> {
+  preview(code: string): PreviewResult {
     const logs: string[] = [];
     const sandbox = this.createSandbox(logs);
     const context = vm.createContext(sandbox);
@@ -52,8 +56,8 @@ export class JavaScriptRunnerService {
       const script = new vm.Script(wrappedCode);
 
       const result = script.runInContext(context, {
-        timeout: 1000,
-      });
+        timeout: SCRIPT_TIMEOUT_MS,
+      }) as unknown;
 
       return {
         ok: true,
@@ -87,13 +91,17 @@ export class JavaScriptRunnerService {
 
       try {
         const script = new vm.Script('"use strict";\n' + params.code);
-        script.runInContext(context, { timeout: 1000 });
+        script.runInContext(context, { timeout: SCRIPT_TIMEOUT_MS });
 
-        const fn = vm.runInContext(params.functionName, context, {
-          timeout: 100,
-        });
+        const hasFunction = vm.runInContext(
+          'typeof ' + params.functionName + ' === "function"',
+          context,
+          {
+            timeout: FUNCTION_LOOKUP_TIMEOUT_MS,
+          },
+        ) as boolean;
 
-        if (typeof fn !== 'function') {
+        if (!hasFunction) {
           throw new Error(
             'Function "' +
               params.functionName +
@@ -101,9 +109,10 @@ export class JavaScriptRunnerService {
           );
         }
 
-        const actual = await Promise.resolve(
-          (fn as (...args: unknown[]) => unknown)(...testCase.input),
-        );
+        const actual = await this.executeFunction(context, {
+          functionName: params.functionName,
+          input: testCase.input,
+        });
 
         const passed = this.deepEqual(actual, testCase.expected);
 
@@ -161,10 +170,66 @@ export class JavaScriptRunnerService {
           logs.push(args.map((arg) => this.stringifyValue(arg)).join(' '));
         },
       },
-      setTimeout,
-      clearTimeout,
-      setInterval,
-      clearInterval,
+      setTimeout: this.createBlockedTimer('setTimeout'),
+      clearTimeout: () => undefined,
+      setInterval: this.createBlockedTimer('setInterval'),
+      clearInterval: () => undefined,
+    };
+  }
+
+  private async executeFunction(
+    context: vm.Context,
+    params: {
+      functionName: string;
+      input: unknown[];
+    },
+  ): Promise<unknown> {
+    const sandbox = context as Record<string, unknown>;
+    sandbox[TEST_ARGS_KEY] = params.input;
+
+    try {
+      const result = vm.runInContext(
+        'Promise.resolve(' +
+          params.functionName +
+          '(...' +
+          TEST_ARGS_KEY +
+          '))',
+        context,
+        {
+          timeout: SCRIPT_TIMEOUT_MS,
+        },
+      ) as unknown;
+
+      return await this.awaitWithinTimeout(
+        result,
+        SCRIPT_TIMEOUT_MS,
+        'Function "' +
+          params.functionName +
+          '" exceeded the ' +
+          SCRIPT_TIMEOUT_MS +
+          'ms execution limit.',
+      );
+    } finally {
+      delete sandbox[TEST_ARGS_KEY];
+    }
+  }
+
+  private awaitWithinTimeout(
+    value: unknown,
+    timeoutMs: number,
+    message: string,
+  ): Promise<unknown> {
+    return Promise.race([
+      Promise.resolve(value),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  }
+
+  private createBlockedTimer(name: 'setTimeout' | 'setInterval') {
+    return () => {
+      throw new Error(name + ' is not supported in the code runner.');
     };
   }
 
@@ -189,8 +254,10 @@ export class JavaScriptRunnerService {
     }
 
     if (value instanceof Map) {
-      return Array.from(value.entries()).map(([key, val]) => [
-        key,
+      const entries = Array.from(value.entries()) as Array<[unknown, unknown]>;
+
+      return entries.map(([key, val]) => [
+        this.normalizeValue(key),
         this.normalizeValue(val),
       ]);
     }
