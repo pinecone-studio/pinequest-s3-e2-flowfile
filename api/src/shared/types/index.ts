@@ -5,3 +5,4 @@ export * from './notification.types';
 export * from './monitoring.types';
 export * from './session.types';
 export * from './question.types';
+export * from './parse-exam.types';
