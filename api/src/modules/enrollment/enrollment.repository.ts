@@ -31,6 +31,18 @@ export class EnrollmentRepository {
     });
   }
 
+  async findEnrollmentByExamAndStudent(
+    examId: string,
+    studentId: string,
+  ): Promise<Enrollment | undefined> {
+    return db.query.examEnrollments.findFirst({
+      where: and(
+        eq(examEnrollments.examId, examId),
+        eq(examEnrollments.studentId, studentId),
+      ),
+    });
+  }
+
   async removeEnrollment(examId: string, studentId: string) {
     await db
       .delete(examEnrollments)
