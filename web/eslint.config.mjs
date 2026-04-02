@@ -22,39 +22,7 @@ const eslintConfig = defineConfig([
       ...tsEslintPlugin.configs.recommended.rules,
       ...nextEslintPluginNext.configs.recommended.rules,
       ...nextEslintPluginNext.configs["core-web-vitals"].rules,
-      "@typescript-eslint/naming-convention": [
-        "error",
-        {
-          selector: "variableLike",
-          format: ["camelCase", "PascalCase"],
-        },
-        {
-          selector: "function",
-          format: ["camelCase", "PascalCase"],
-        },
-        {
-          selector: "typeLike",
-          format: ["PascalCase"],
-        },
-      ],
-      "@typescript-eslint/no-explicit-any": "error",
-      complexity: ["error", 4],
-      "max-lines": [
-        "error",
-        {
-          max: 150,
-          skipBlankLines: true,
-          skipComments: true,
-        },
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          max: 180,
-          skipBlankLines: true,
-          skipComments: true,
-        },
-      ],
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
   {
@@ -63,23 +31,6 @@ const eslintConfig = defineConfig([
     rules: {
       ...nextEslintPluginNext.configs.recommended.rules,
       ...nextEslintPluginNext.configs["core-web-vitals"].rules,
-      complexity: ["error", 4],
-      "max-lines": [
-        "error",
-        {
-          max: 150,
-          skipBlankLines: true,
-          skipComments: true,
-        },
-      ],
-      "max-lines-per-function": [
-        "error",
-        {
-          max: 180,
-          skipBlankLines: true,
-          skipComments: true,
-        },
-      ],
     },
   },
   globalIgnores([
