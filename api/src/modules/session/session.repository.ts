@@ -8,6 +8,7 @@ import type {
   SessionStatus,
 } from 'src/shared/types/session.types';
 
+
 @Injectable()
 export class SessionRepository {
   async findSessionByStudentAndExam(
@@ -33,6 +34,10 @@ export class SessionRepository {
       where: eq(examSessions.examId, examId),
       orderBy: desc(examSessions.createdAt),
     });
+  }
+
+  async findAllSessions(): Promise<Session[]> {
+    return db.query.examSessions.findMany({ orderBy: desc(examSessions.createdAt) });
   }
 
   async findSessionsByStudent(studentId: string): Promise<Session[]> {
@@ -142,6 +147,20 @@ export class SessionRepository {
       .where(eq(examSessions.id, id))
       .returning();
 
+    return session;
+  }
+
+  async submitSessionWithScore(
+    id: string,
+    status: Extract<SessionStatus, 'submitted' | 'force_submitted'>,
+    score: number,
+  ) {
+    const now = new Date().toISOString();
+    const [session] = await db
+      .update(examSessions)
+      .set({ status, score, submittedAt: now, updatedAt: now })
+      .where(eq(examSessions.id, id))
+      .returning();
     return session;
   }
 
