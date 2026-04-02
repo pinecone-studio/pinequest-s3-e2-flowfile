@@ -100,7 +100,11 @@ export function ChemistryEditorClient({
 
   return (
     <div className="overflow-hidden rounded-xl border border-card-border bg-white">
-      <div className="h-[420px]">
+      <div className="border-b border-card-border bg-[#EEF7F1] px-4 py-3">
+        <div className="text-[13px] font-semibold text-foreground">Ketcher molecule editor</div>
+        <div className="text-[12px] text-text-secondary">Мобайл дээр ч атом, холбоо, бүтэц зурж molfile байдлаар хадгална.</div>
+      </div>
+      <div className="h-[340px] md:h-[420px]">
         <EditorComponent
           staticResourcesUrl="/"
           structServiceProvider={provider}
