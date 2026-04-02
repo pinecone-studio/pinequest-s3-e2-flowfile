@@ -1,14 +1,51 @@
-import { apiFetch, getApiUrl, getAuthHeaders, isApiConfigured } from '@/lib/api/client'
+'use client'
+
+import {
+  apiFetch,
+  getApiUrl,
+  getAuthHeaders,
+  isApiConfigured,
+} from '@/lib/api/client'
+
+export type StudentExamStatus =
+  | 'upcoming'
+  | 'ready'
+  | 'in_progress'
+  | 'submitted'
+  | 'force_submitted'
+  | 'closed'
+
+export type StudentExamQuestionType =
+  | 'single'
+  | 'multiple'
+  | 'truefalse'
+  | 'matching'
+  | 'short'
+  | 'long'
+  | 'formula'
+  | 'chemistry'
+  | 'code'
+  | 'voice'
+  | 'video'
+  | 'handwritten'
+
+type StudentSessionStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'submitted'
+  | 'force_submitted'
 
 export interface StudentExamQuestion {
   id: string
   text: string
-  type: 'single' | 'multiple' | 'truefalse' | 'matching' | 'short' | 'long' | 'formula' | 'chemistry' | 'code' | 'voice' | 'video' | 'handwritten'
+  type: StudentExamQuestionType
   points: number
   order: number
   options?: string[]
-  matchingPairs?: { left: string; right: string }[]
+  matchingPairs?: Array<{ left: string; right: string }>
   correctAnswer?: string | string[] | null
+  subjectHint?: string | null
+  isRequired?: boolean
 }
 
 export interface StudentExamSummary {
@@ -17,20 +54,58 @@ export interface StudentExamSummary {
     title: string
     subjectId: string
     subject: string
+    description?: string | null
+    teacherId: string
     durationMinutes: number
     startsAt: string | null
     endsAt: string | null
+    status: string
   }
   session: {
     id: string
-    status: string
+    status: StudentSessionStatus
     startedAt: string | null
     submittedAt: string | null
   } | null
   enrolledAt: string
-  attemptStatus: 'upcoming' | 'ready' | 'in_progress' | 'submitted' | 'force_submitted' | 'closed'
+  attemptStatus: StudentExamStatus
   timing: {
+    serverTime: string
+    startedAt: string | null
+    expiresAt: string | null
+    timeLimitMinutes: number
     timeRemainingSeconds: number
+    isExpired: boolean
+  } | null
+}
+
+interface RawStudentExamSummary {
+  exam: {
+    id: string
+    title: string
+    subject: string
+    description?: string | null
+    teacherId: string
+    durationMinutes: number
+    startsAt: string | null
+    endsAt: string | null
+    status: string
+  }
+  session: {
+    id: string
+    status: StudentSessionStatus
+    startedAt: string | null
+    submittedAt: string | null
+  } | null
+  enrolledAt: string
+  attemptStatus: StudentExamStatus
+  timing: {
+    serverTime: string
+    startedAt: string | null
+    expiresAt: string | null
+    timeLimitMinutes: number
+    timeRemainingSeconds: number
+    isExpired: boolean
   } | null
 }
 
@@ -39,36 +114,97 @@ interface ApiAttemptResponse {
     id: string
     title: string
     subject: string
+    description: string | null
     teacherId: string
     durationMinutes: number
+    startsAt: string | null
+    endsAt: string | null
+    status: string
   }
   session: {
     id: string
-    status: string
+    status: StudentSessionStatus
     startedAt: string | null
     submittedAt: string | null
   }
   questions: Array<{
     id: string
-    content: string
-    inputType: string
-    points: number
     orderIndex: number
-    optionsJson?: string | null
+    content: string
+    inputType:
+      | 'mcq'
+      | 'short_text'
+      | 'rich_text'
+      | 'math_formula'
+      | 'chem_formula'
+      | 'handwritten'
+      | 'voice_record'
+    subjectHint: string | null
+    points: number
+    isRequired: boolean
+    optionsJson: string | null
     correctAnswer?: string | null
   }>
   answers: Array<{
+    id: string
     questionId: string
-    textAnswer?: string | null
-    formulaAnswerJson?: string | null
-    fileUrl?: string | null
+    textAnswer: string | null
+    formulaAnswerJson: string | null
+    fileUrl: string | null
+    lastSavedAt: string
+    isFinal: boolean
   }>
   timing: {
+    serverTime: string
+    startedAt: string | null
+    expiresAt: string | null
+    timeLimitMinutes: number
     timeRemainingSeconds: number
+    isExpired: boolean
   }
 }
 
-function mapInputType(inputType: string): StudentExamQuestion['type'] {
+function parseMaybeJson<T>(value?: string | null, fallback?: T): T | undefined {
+  if (!value) {
+    return fallback
+  }
+
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return fallback
+  }
+}
+
+function parseOptions(optionsJson: string | null) {
+  if (!optionsJson) {
+    return undefined
+  }
+
+  try {
+    const parsed = JSON.parse(optionsJson) as unknown
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function inferQuestionType(
+  inputType: ApiAttemptResponse['questions'][number]['inputType'],
+  subjectHint?: string | null,
+): StudentExamQuestionType {
+  const hint = subjectHint?.toLowerCase() ?? ''
+
+  if (hint.includes('video')) {
+    return 'video'
+  }
+
+  if (hint.includes('code')) {
+    return 'code'
+  }
+
   switch (inputType) {
     case 'mcq':
       return 'single'
@@ -85,62 +221,101 @@ function mapInputType(inputType: string): StudentExamQuestion['type'] {
     case 'handwritten':
       return 'handwritten'
     default:
-      return 'short'
+      return 'long'
   }
 }
 
-function parseMaybeJson<T>(value?: string | null, fallback?: T): T | undefined {
+function parseStructuredAnswer(value: string | null) {
   if (!value) {
-    return fallback
+    return ''
   }
 
   try {
-    return JSON.parse(value) as T
+    const parsed = JSON.parse(value) as unknown
+    if (typeof parsed === 'string') {
+      return parsed
+    }
+
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'value' in parsed &&
+      typeof parsed.value === 'string'
+    ) {
+      return parsed.value
+    }
   } catch {
-    return fallback
+    return value
   }
+
+  return value
 }
 
-export function mapAttemptToQuestionList(attempt: ApiAttemptResponse): StudentExamQuestion[] {
+export function mapAttemptToQuestionList(
+  attempt: ApiAttemptResponse,
+): StudentExamQuestion[] {
   return attempt.questions
     .slice()
     .sort((left, right) => left.orderIndex - right.orderIndex)
     .map((question) => ({
       id: question.id,
       text: question.content,
-      type: mapInputType(question.inputType),
+      type: inferQuestionType(question.inputType, question.subjectHint),
       points: question.points,
       order: question.orderIndex,
-      options: parseMaybeJson<string[]>(question.optionsJson, []),
+      options: parseOptions(question.optionsJson),
+      matchingPairs: parseMaybeJson<Array<{ left: string; right: string }>>(
+        question.optionsJson,
+      ),
       correctAnswer: null,
+      subjectHint: question.subjectHint,
+      isRequired: question.isRequired,
     }))
 }
 
 export function mapAttemptToAnswerMap(attempt: ApiAttemptResponse) {
   return attempt.answers.reduce<Record<string, string>>((result, answer) => {
-    result[answer.questionId] =
-      answer.textAnswer ??
-      answer.formulaAnswerJson ??
-      answer.fileUrl ??
-      ''
+    if (answer.fileUrl) {
+      result[answer.questionId] = answer.fileUrl
+      return result
+    }
+
+    if (answer.formulaAnswerJson) {
+      result[answer.questionId] = parseStructuredAnswer(answer.formulaAnswerJson)
+      return result
+    }
+
+    if (answer.textAnswer) {
+      result[answer.questionId] = parseStructuredAnswer(answer.textAnswer)
+    }
+
     return result
   }, {})
 }
 
 export async function fetchAssignedExams() {
-  const data = await apiFetch<StudentExamSummary[]>('/exams/assigned/me')
+  const data = await apiFetch<RawStudentExamSummary[]>('/exams/assigned/me')
 
-  return data.map((item) => ({
-    ...item,
-    exam: {
-      ...item.exam,
-      subjectId: item.exam.subject,
-    },
-  }))
+  return data.map(
+    (item): StudentExamSummary => ({
+      ...item,
+      exam: {
+        ...item.exam,
+        subjectId: item.exam.subject,
+      },
+    }),
+  )
 }
 
 export async function startExamSession(examId: string) {
-  return apiFetch<{ id: string; status: string; startedAt: string | null }>(`/sessions/exam/${examId}/start`, {
+  return apiFetch<{
+    id: string
+    examId: string
+    studentId: string
+    status: StudentSessionStatus
+    startedAt: string | null
+    submittedAt: string | null
+  }>(`/sessions/exam/${examId}/start`, {
     method: 'POST',
   })
 }
@@ -160,7 +335,7 @@ export async function autosaveExamAnswer(params: {
   question: StudentExamQuestion
   value: string
 }) {
-  const payload: {
+  const body: {
     sessionId: string
     questionId: string
     textAnswer?: string
@@ -171,19 +346,110 @@ export async function autosaveExamAnswer(params: {
     questionId: params.question.id,
   }
 
-  if (params.question.type === 'formula' || params.question.type === 'chemistry' || params.question.type === 'matching') {
-    payload.formulaAnswerJson = params.value
-  } else if (params.question.type === 'voice' || params.question.type === 'video' || params.question.type === 'handwritten') {
-    payload.fileUrl = params.value
+  if (
+    params.question.type === 'formula' ||
+    params.question.type === 'chemistry' ||
+    params.question.type === 'matching'
+  ) {
+    body.formulaAnswerJson = JSON.stringify({
+      type: params.question.type,
+      value: params.value,
+    })
+  } else if (
+    params.question.type === 'voice' ||
+    params.question.type === 'video' ||
+    params.question.type === 'handwritten'
+  ) {
+    body.fileUrl = params.value
   } else {
-    payload.textAnswer = params.value
+    body.textAnswer = params.value
   }
 
   return apiFetch('/answers/autosave', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function runPreviewCode(code: string) {
+  return apiFetch<{
+    ok?: boolean
+    logs: string[]
+    result: unknown
+    error: string | null
+  }>('/code/run', {
+    method: 'POST',
+    body: JSON.stringify({
+      code,
+      mode: 'preview',
+    }),
+  })
+}
+
+export async function createProctoringViolation(payload: {
+  teacherId: string
+  studentId: string
+  studentName: string
+  examId: string
+  examTitle: string
+  assignmentId: string
+  sessionId?: string
+  teacherName?: string
+  classId?: string
+  className?: string
+  type:
+    | 'face_not_detected'
+    | 'multiple_faces_detected'
+    | 'tab_switch'
+    | 'window_blur'
+    | 'audio_detected'
+    | 'device_changed'
+  details?: string
+  metadata?: Record<string, string | number | boolean | null>
+}) {
+  if (!isApiConfigured()) {
+    return null
+  }
+
+  return apiFetch('/proctoring/violations', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...payload,
+      metadata: {
+        ...(payload.metadata ?? {}),
+        ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
+      },
+    }),
+  })
+}
+
+export async function saveOfflineDraft(payload: {
+  draftKey: string
+  assignmentId: string
+  examId: string
+  studentId: string
+  answers: Record<string, string | string[]>
+  markedForReview: string[]
+  currentIndex: number
+  startedAt: string
+  updatedAt: string
+}) {
+  return apiFetch('/offline-exam-sync/draft', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function saveOfflineSubmission(payload: {
+  assignmentId: string
+  examId: string
+  studentId: string
+  attempt: Record<string, unknown>
+  result: Record<string, unknown>
+  queuedAt: string
+}) {
+  return apiFetch('/offline-exam-sync/submission', {
+    method: 'POST',
     body: JSON.stringify(payload),
   })
 }
@@ -207,52 +473,19 @@ export async function uploadAnswerAsset(file: File, kind?: string) {
       ...getAuthHeaders('student'),
     },
     body: formData,
+    cache: 'no-store',
   })
 
   if (!response.ok) {
-    throw new Error(await response.text())
+    const message = await response.text()
+    throw new Error(message || `Upload failed with status ${response.status}`)
   }
 
-  return response.json() as Promise<{ url: string }>
-}
-
-export async function runPreviewCode(code: string) {
-  return apiFetch<{ logs: string[]; result: unknown; error: string | null }>('/code/run', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      code,
-      mode: 'preview',
-    }),
-  })
-}
-
-export async function createProctoringViolation(params: {
-  studentId: string
-  examId: string
-  sessionId?: string
-  type: 'tab_switch' | 'window_blur'
-  teacherId?: string
-  studentName?: string
-  examTitle?: string
-  assignmentId?: string
-}) {
-  if (!isApiConfigured()) {
-    return null
-  }
-
-  return apiFetch('/monitoring/events', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      sessionId: params.sessionId ?? `${params.examId}:${params.studentId}`,
-      studentId: params.studentId,
-      examId: params.examId,
-      eventType: params.type,
-    }),
-  })
+  return response.json() as Promise<{
+    url: string
+    fileName: string
+    mimeType: string
+    size: number
+    kind?: string | null
+  }>
 }
