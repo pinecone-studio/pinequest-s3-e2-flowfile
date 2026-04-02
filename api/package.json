@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "load:test:student-exam": "k6 run load-tests/student-exam-flow.js",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
