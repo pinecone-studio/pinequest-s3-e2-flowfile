@@ -56,7 +56,7 @@ export function ResultExamList({
             </button>
           )
         })}
-        {studentResults.length === 0 && <div className="text-center py-12 text-text-secondary text-[14px]">Үр дүн байхгүй байна.</div>}
+        {studentResults.length === 0 && <div className="text-center py-12 text-text-secondary text-[14px]">Ил гарсан үр дүн хараахан алга байна.</div>}
       </div>
     </div>
   )
