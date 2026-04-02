@@ -10,8 +10,13 @@ export function StudentProctoringPreview({
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const dragStartRef = useRef<{ x: number; y: number } | null>(null)
+  const visibilityHandlerRef = useRef(onVisibilityViolation)
   const [isMobile, setIsMobile] = useState(false)
   const [position, setPosition] = useState({ x: 0, y: 0 })
+
+  useEffect(() => {
+    visibilityHandlerRef.current = onVisibilityViolation
+  }, [onVisibilityViolation])
 
   useEffect(() => {
     let isMounted = true
@@ -41,11 +46,11 @@ export function StudentProctoringPreview({
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        onVisibilityViolation?.('tab_switch')
+        visibilityHandlerRef.current?.('tab_switch')
       }
     }
 
-    const handleBlur = () => onVisibilityViolation?.('window_blur')
+    const handleBlur = () => visibilityHandlerRef.current?.('window_blur')
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('blur', handleBlur)
@@ -56,7 +61,7 @@ export function StudentProctoringPreview({
       window.removeEventListener('blur', handleBlur)
       streamRef.current?.getTracks().forEach((track) => track.stop())
     }
-  }, [onVisibilityViolation])
+  }, [])
 
   useEffect(() => {
     const updateViewport = () => {
@@ -138,7 +143,7 @@ export function StudentProctoringPreview({
       window.removeEventListener('touchmove', handleTouchMove)
       window.removeEventListener('touchend', stopDrag)
     }
-  }, [isMobile, position.x, position.y])
+  }, [isMobile])
 
   if (isMobile) {
     return (
