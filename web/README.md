@@ -1,8 +1,22 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Requirements
+
+Use Node.js `>=21.7.3`.
+
+`mathlive` depends on `@cortex-js/compute-engine@0.30.2`, which does not install on Node 20.
+
 ## Getting Started
 
-First, run the development server:
+First, switch to a compatible Node version and install dependencies:
+
+```bash
+nvm install 22
+nvm use 22
+yarn install
+```
+
+Then run the development server:
 
 ```bash
 npm run dev
