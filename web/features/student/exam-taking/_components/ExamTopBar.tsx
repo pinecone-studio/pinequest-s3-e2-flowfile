@@ -29,8 +29,9 @@ export function ExamTopBar({
   onSubmitClick,
 }: ExamTopBarProps) {
   return (
-    <div className="h-14 border-b border-card-border bg-white flex items-center justify-between px-6 shrink-0">
-      <div className="flex items-center gap-4">
+    <div className="shrink-0 border-b border-card-border bg-white px-4 py-3 md:px-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[12px] font-bold"
@@ -43,33 +44,34 @@ export function ExamTopBar({
             <div className="text-[11px] text-text-secondary">{subjectName}</div>
           </div>
         </div>
-      </div>
-
-      <div className="flex items-center gap-6">
-        <div className="text-[13px] text-text-secondary">
-          Асуулт <span className="font-semibold text-foreground">{currentIndex + 1}</span> / {totalQuestions}
         </div>
 
-        <div className={cn(
-          "flex items-center gap-2 px-4 py-2 rounded-lg",
-          timeRemaining <= 300 ? "bg-red-50" : "bg-table-header"
-        )}>
-          <Clock size={16} className={timeRemaining <= 300 ? "text-red-500" : "text-text-secondary"} strokeWidth={1.5} />
-          <span className={cn(
-            "text-[16px] font-mono font-bold tabular-nums",
-            timeRemaining <= 300 ? "text-red-500" : "text-foreground"
+        <div className="flex flex-wrap items-center gap-3 md:gap-6">
+          <div className="text-[13px] text-text-secondary">
+            Асуулт <span className="font-semibold text-foreground">{currentIndex + 1}</span> / {totalQuestions}
+          </div>
+
+          <div className={cn(
+            "flex items-center gap-2 rounded-lg px-4 py-2",
+            timeRemaining <= 300 ? "bg-red-50" : "bg-table-header"
           )}>
-            {formattedTime}
-          </span>
-        </div>
+            <Clock size={16} className={timeRemaining <= 300 ? "text-red-500" : "text-text-secondary"} strokeWidth={1.5} />
+            <span className={cn(
+              "text-[16px] font-mono font-bold tabular-nums",
+              timeRemaining <= 300 ? "text-red-500" : "text-foreground"
+            )}>
+              {formattedTime}
+            </span>
+          </div>
 
-        <button
-          onClick={onSubmitClick}
-          className="px-5 py-2 bg-primary text-white text-[13px] font-semibold rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
-        >
-          <Send size={14} strokeWidth={1.5} />
-          Дуусгах
-        </button>
+          <button
+            onClick={onSubmitClick}
+            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-primary/90"
+          >
+            <Send size={14} strokeWidth={1.5} />
+            Дуусгах
+          </button>
+        </div>
       </div>
     </div>
   )
