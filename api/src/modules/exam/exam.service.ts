@@ -16,6 +16,7 @@ import { QuestionRepository } from '../question/question.repository';
 import { EnrollmentRepository } from '../enrollment/enrollment.repository';
 import { SessionRepository } from '../session/session.repository';
 import { getSessionTiming } from 'src/shared/utils/exam-session';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class ExamService {
@@ -24,6 +25,7 @@ export class ExamService {
     private readonly questionRepo: QuestionRepository,
     private readonly enrollmentRepo: EnrollmentRepository,
     private readonly sessionRepo: SessionRepository,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async getAllExams() {
@@ -146,7 +148,13 @@ export class ExamService {
       }
     }
 
-    return this.examRepo.updateExamStatus(id, status);
+    const updatedExam = await this.examRepo.updateExamStatus(id, status);
+
+    if (status === 'scheduled' || status === 'published') {
+      await this.notifyStudentsAboutAssignedExam(updatedExam);
+    }
+
+    return updatedExam;
   }
 
   async deleteExam(id: string, teacherId: string) {
@@ -233,5 +241,27 @@ export class ExamService {
     }
 
     return 'closed';
+  }
+
+  private async notifyStudentsAboutAssignedExam(exam: {
+    id: string;
+    title: string;
+    startsAt: string | null;
+  }) {
+    const enrollments = await this.enrollmentRepo.findEnrollmentsByExam(exam.id);
+
+    await Promise.all(
+      enrollments.map((enrollment) =>
+        this.notificationService.createNotification({
+          recipientId: enrollment.studentId,
+          examId: exam.id,
+          title: 'New exam assigned',
+          body: exam.startsAt
+            ? `"${exam.title}" is scheduled for ${exam.startsAt}.`
+            : `"${exam.title}" is now available.`,
+          type: 'exam_published',
+        }),
+      ),
+    );
   }
 }
