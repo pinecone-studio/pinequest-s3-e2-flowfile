@@ -5,6 +5,7 @@ interface SubmitModalProps {
   answeredCount: number
   unansweredCount: number
   markedCount: number
+  isSubmitting?: boolean
   onCancel: () => void
   onConfirm: () => void
 }
@@ -14,6 +15,7 @@ export function SubmitModal({
   answeredCount,
   unansweredCount,
   markedCount,
+  isSubmitting,
   onCancel,
   onConfirm,
 }: SubmitModalProps) {
@@ -56,9 +58,10 @@ export function SubmitModal({
             </button>
             <button
               onClick={onConfirm}
+              disabled={isSubmitting}
               className="flex-1 py-3 bg-primary text-white text-[14px] font-medium rounded-xl hover:bg-primary/90 transition-colors"
             >
-              Дуусгах
+              {isSubmitting ? 'Илгээж байна...' : 'Дуусгах'}
             </button>
           </div>
         </div>
