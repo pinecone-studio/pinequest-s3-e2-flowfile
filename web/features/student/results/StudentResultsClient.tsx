@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Trophy, CheckCircle, Clock } from 'lucide-react'
 import { getAll } from '@/lib/data'
-import type { Exam, Result, Question, Attempt, Course } from '@/lib/types'
-import { initialExams, initialResults, initialQuestions, initialAttempts, initialCourses, CURRENT_STUDENT_ID } from '@/lib/data'
+import type { Exam, Result, Question, Attempt } from '@/lib/types'
+import { initialExams, initialResults, initialQuestions, initialAttempts, CURRENT_STUDENT_ID } from '@/lib/data'
 import { ResultExamList } from './_components/ResultExamList'
 import { ResultDetail } from './_components/ResultDetail'
 
 export function StudentResultsClient() {
+  const searchParams = useSearchParams()
   const [exams, setExams] = useState<Exam[]>(initialExams)
   const [results, setResults] = useState<Result[]>(initialResults)
   const [questions, setQuestions] = useState<Question[]>(initialQuestions)
@@ -29,9 +31,28 @@ export function StudentResultsClient() {
   }, [])
 
   const studentResults = results.filter(r => r.studentId === currentStudentId)
-  const selectedResult = results.find(r => r.id === selectedResultId) || null
-  const selectedExam = selectedResult ? exams.find(e => e.id === selectedResult.examId) || null : null
-  const selectedAttempt = selectedResult ? attempts.find(a => a.id === selectedResult.attemptId) || null : null
+  const requestedExamId = searchParams.get('examId')
+  const selectedResult =
+    results.find(r => r.id === selectedResultId) ||
+    (requestedExamId
+      ? studentResults.find(r => r.examId === requestedExamId) || null
+      : null)
+  const selectedExam = selectedResult
+    ? exams.find(e => e.id === selectedResult.examId) || null
+    : requestedExamId
+      ? exams.find(e => e.id === requestedExamId) || null
+      : null
+  const selectedAttempt = selectedResult
+    ? attempts.find(a => a.id === selectedResult.attemptId) || null
+    : requestedExamId
+      ? attempts
+          .filter(a => a.examId === requestedExamId && a.studentId === currentStudentId)
+          .sort((a, b) => {
+            const left = a.submittedAt || a.endedAt || a.startedAt
+            const right = b.submittedAt || b.endedAt || b.startedAt
+            return new Date(right).getTime() - new Date(left).getTime()
+          })[0] || null
+      : null
   const getExam = (examId: string) => exams.find(e => e.id === examId)
   const getExamQuestions = (exam: Exam) => questions.filter(q => exam.questionIds.includes(q.id))
   const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('mn-MN', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -59,8 +80,8 @@ export function StudentResultsClient() {
           </div>
         ))}
       </div>
-      <div className="flex gap-6">
-        <div className="w-[300px] shrink-0">
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <div className="w-full shrink-0 lg:w-[300px]">
           <ResultExamList studentResults={studentResults} selectedResultId={selectedResultId} getExam={getExam} attempts={attempts} formatDate={formatDate} onSelect={setSelectedResultId} />
         </div>
         <div className="flex-1">
