@@ -72,6 +72,44 @@ export class SessionService {
     return this.sessionRepo.findSessionsByExam(examId);
   }
 
+  async getAllSessions() {
+    return this.sessionRepo.findAllSessions();
+  }
+
+  async getExamAnalytics(examId: string, user: AuthenticatedUser) {
+    await this.ensureTeacherOwnsExam(examId, user.id);
+    const [sessions, questions, allAnswers] = await Promise.all([
+      this.sessionRepo.findSessionsByExam(examId),
+      this.questionRepo.findQuestionsByExam(examId),
+      this.answerRepo.findAnswersByExam(examId),
+    ]);
+    const submitted = sessions.filter(
+      (s) => s.status === 'submitted' || s.status === 'force_submitted',
+    );
+    const submittedIds = new Set(submitted.map((s) => s.id));
+    return questions.map((q) => {
+      const qAnswers = allAnswers.filter(
+        (a) => a.questionId === q.id && submittedIds.has(a.sessionId),
+      );
+      const correctCount = qAnswers.filter(
+        (a) => a.textAnswer === q.correctAnswer,
+      ).length;
+      return {
+        questionId: q.id,
+        content: q.content,
+        inputType: q.inputType,
+        points: q.points,
+        totalAnswers: qAnswers.length,
+        correctCount,
+        incorrectCount: qAnswers.length - correctCount,
+        errorRate:
+          qAnswers.length > 0
+            ? (qAnswers.length - correctCount) / qAnswers.length
+            : 0,
+      };
+    });
+  }
+
   async startSession(
     studentId: string,
     examId: string,
@@ -200,9 +238,11 @@ export class SessionService {
 
     await this.answerRepo.finalizeAnswers(id);
 
-    const submittedSession = await this.sessionRepo.submitSession(
+    const score = await this.calculateScore(id, session.examId);
+    const submittedSession = await this.sessionRepo.submitSessionWithScore(
       id,
       resolvedStatus,
+      score,
     );
 
     await this.notifyExamSubmitted(exam, submittedSession, resolvedStatus);
@@ -256,6 +296,19 @@ export class SessionService {
     );
 
     return submittedSession;
+  }
+
+  private async calculateScore(sessionId: string, examId: string): Promise<number> {
+    const [answers, questions] = await Promise.all([
+      this.answerRepo.findAnswersBySession(sessionId),
+      this.questionRepo.findQuestionsByExam(examId),
+    ]);
+    const qMap = new Map(questions.map((q) => [q.id, q]));
+    return answers.reduce((total, a) => {
+      const q = qMap.get(a.questionId);
+      if (!q?.correctAnswer || q.inputType !== 'mcq') return total;
+      return a.textAnswer === q.correctAnswer ? total + q.points : total;
+    }, 0);
   }
 
   private async ensureSessionAccessByExam(
