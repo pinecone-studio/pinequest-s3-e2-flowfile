@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from 'src/database/client';
-import { answers } from 'src/database/schema/sessions.schema';
+import { answers, examSessions } from 'src/database/schema/sessions.schema';
 import type { Answer, NewAnswer } from 'src/shared/types/answer.types';
 
 @Injectable()
@@ -49,6 +49,15 @@ export class AnswerRepository {
 
     const [answer] = await db.insert(answers).values(data).returning();
     return answer;
+  }
+
+  async findAnswersByExam(examId: string): Promise<Answer[]> {
+    return db
+      .select({ answer: answers })
+      .from(answers)
+      .innerJoin(examSessions, eq(answers.sessionId, examSessions.id))
+      .where(eq(examSessions.examId, examId))
+      .then((rows) => rows.map((r) => r.answer));
   }
 
   async finalizeAnswers(sessionId: string) {
