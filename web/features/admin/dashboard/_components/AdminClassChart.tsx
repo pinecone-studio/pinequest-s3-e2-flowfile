@@ -1,7 +1,6 @@
 'use client'
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import type { SchoolClass } from '@/lib/types'
 
 interface ClassRow { id: string; name: string; avg: number }
 
