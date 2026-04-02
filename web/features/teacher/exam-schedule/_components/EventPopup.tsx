@@ -6,10 +6,9 @@ type ClassItem = { id: string; name: string }
 const statusLabels: Record<string, string> = { scheduled: 'Товлогдсон', active: 'Идэвхтэй', completed: 'Дууссан' }
 const statusStyles: Record<string, string> = { scheduled: 'bg-[#B45309]/12 text-[#B45309]', active: 'bg-[#1A7A4A]/12 text-[#1A7A4A]', completed: 'bg-[#5A6474]/12 text-[#5A6474]' }
 
-export function EventPopup({ event, getClass, onClose }: {
+export function EventPopup({ event, getClass }: {
   event: { assignment: ExamAssignment; exam: Exam; position: { x: number; y: number } }
   getClass: (classId: string) => ClassItem | undefined
-  onClose: () => void
 }) {
   return (
     <div className="fixed bg-white border rounded-[10px] shadow-lg w-[200px] z-50" style={{ left: event.position.x, top: event.position.y, borderColor: '#DDE1E7' }} onClick={(e) => e.stopPropagation()}>
