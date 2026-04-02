@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils'
 import { Plus, Search } from 'lucide-react'
 import { initialExamAssignments, initialExams, initialClasses, initialCourses, initialResults, CURRENT_TEACHER_ID } from '@/lib/data'
 import { ExamCard } from './_components/ExamCard'
-import type { ExamAssignment, Exam, SchoolClass, Course } from '@/lib/types'
 
 type FilterTab = 'all' | 'scheduled' | 'active' | 'closed'
 
