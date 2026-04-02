@@ -67,7 +67,7 @@ export function TeacherShellFeature({ children }: TeacherShellFeatureProps) {
       )}
 
       <main
-        className="flex-1 md:pt-0 pt-12 overflow-auto"
+        className="flex-1 pt-12 md:pt-0"
         style={{ backgroundColor: '#F0F2F5' }}
       >
         {children}
