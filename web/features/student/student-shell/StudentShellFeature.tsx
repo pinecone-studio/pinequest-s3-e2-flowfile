@@ -23,7 +23,7 @@ export function StudentShellFeature({ children }: StudentShellFeatureProps) {
           navLinks={studentNavLinks}
           studentDisplayName={studentDisplayName}
         />
-        <main className="p-6">
+        <main className="px-4 pb-4 pt-[112px] md:px-6 md:pb-6 md:pt-[92px]">
           {children}
         </main>
       </div>
