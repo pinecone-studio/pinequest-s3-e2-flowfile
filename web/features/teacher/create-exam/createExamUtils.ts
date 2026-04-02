@@ -1,18 +1,57 @@
 import type { Course, Question, Exam, QuestionType } from '@/lib/types'
 import { SUBJECT_NAMES } from '@/lib/constants'
 import { CURRENT_TEACHER_ID, save } from '@/lib/data'
+import { getApiUrl } from '@/lib/api/client'
 
 export type ImportedQuestionPayload = {
   question?: string; type?: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay'
   options?: string[]; correctAnswer?: string | string[]; points?: number
 }
 export type ImportApiResponse = { questions?: ImportedQuestionPayload[]; parser?: string; error?: string }
+export type ImportFailure = { fileName: string; reason: string }
 
 export const stepLabels = ['Эх сурвалж', 'Ерөнхий мэдээлэл', 'Асуултууд', 'Хуваарь']
 const MANUAL_QUESTION_TYPES: QuestionType[] = ['short', 'long', 'formula', 'code']
-const parseExamApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL
-  ? new URL('/parse-exam', process.env.NEXT_PUBLIC_API_BASE_URL).toString()
-  : ''
+
+function getDevAuthHeaders() {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  const token = window.localStorage.getItem('seedcone.dev_auth_token')
+  return token ? { Authorization: `Bearer ${token}` } : undefined
+}
+
+function getImportApiUrl() {
+  return getApiUrl('/parse-exam')
+}
+
+async function postImportPayload(
+  payload: Record<string, unknown>,
+) {
+  const url = getImportApiUrl()
+
+  if (!url) {
+    throw new Error('NEXT_PUBLIC_API_BASE_URL is not configured.')
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getDevAuthHeaders(),
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const data = (await response.json()) as ImportApiResponse
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Файл боловсруулах хүсэлт амжилтгүй боллоо.')
+  }
+
+  return data
+}
 
 export function isManualQuestionType(type: QuestionType) { return MANUAL_QUESTION_TYPES.includes(type) }
 export function getCourseLabel(course: Course) {
@@ -38,20 +77,44 @@ export function mapImportedQuestions(items: ImportedQuestionPayload[], existingC
 }
 
 export async function processImportFiles(files: File[], title: string, courseLabel: string) {
-  if (!parseExamApiUrl) throw new Error('NEXT_PUBLIC_API_BASE_URL is not configured.')
-  const collected: ImportedQuestionPayload[] = []; const skipped: string[] = []; let usedLocalParser = false
+  const collected: ImportedQuestionPayload[] = []; const skipped: string[] = []; const failures: ImportFailure[] = []; let usedLocalParser = false
   for (const file of files) {
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
     const isBinary = ['docx', 'pdf'].includes(ext)
-    const fileText = isBinary ? '' : await file.text()
-    const fileBuffer = isBinary ? arrayBufferToBase64(await file.arrayBuffer()) : undefined
-    const res = await fetch(parseExamApiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileText, fileBuffer, fileType: file.type, fileName: file.name, title, courseLabel }) })
-    const payload = await res.json() as ImportApiResponse
-    if (!res.ok) { skipped.push(file.name); continue }
+
+    let payload: ImportApiResponse
+
+    try {
+      const fileText = isBinary ? '' : await file.text()
+      const fileBuffer = isBinary ? arrayBufferToBase64(await file.arrayBuffer()) : undefined
+      payload = await postImportPayload({
+        fileText,
+        fileBuffer,
+        fileType: file.type,
+        fileName: file.name,
+        title,
+        courseLabel,
+      })
+    } catch (error) {
+      skipped.push(file.name)
+      failures.push({
+        fileName: file.name,
+        reason: error instanceof Error ? error.message : 'Файл боловсруулах үед тодорхойгүй алдаа гарлаа.',
+      })
+      continue
+    }
+
     if (payload.parser === 'local') usedLocalParser = true
-    if (payload.questions?.length) collected.push(...payload.questions); else skipped.push(file.name)
+    if (payload.questions?.length) collected.push(...payload.questions)
+    else {
+      skipped.push(file.name)
+      failures.push({
+        fileName: file.name,
+        reason: payload.error || 'Асуулт таньж чадсангүй.',
+      })
+    }
   }
-  return { collected, skipped, usedLocalParser }
+  return { collected, skipped, failures, usedLocalParser }
 }
 
 export function generateMockAIQuestions(aiTopic: string, aiDifficulty: 'easy' | 'medium' | 'hard', aiCount: number): Question[] {
@@ -85,7 +148,7 @@ export function saveExamPayload(params: {
   const now = new Date().toISOString(); const newExamId = `exam-${Date.now()}`
   const prepared = questions.map((q, i) => ({ ...q, examId: newExamId, order: i + 1, isManualGrade: isManualQuestionType(q.type) }))
   const exam: Exam = { id: newExamId, title, subjectId: selectedCourse.subjectId, grade: selectedCourse.grade, chapter: chapter || undefined, topic: topic || undefined, description: description || undefined, duration, totalPoints, ownerType: 'teacher', visibility, ownerId: CURRENT_TEACHER_ID, collaboratorIds: [], createdAt: now, updatedAt: now, questionIds: prepared.map(q => q.id), status: selectedClasses.length > 0 ? 'published' : 'draft', isTemplate: false, tags: [selectedCourse.subjectId, chapter, topic].filter(Boolean) as string[] }
-  prepared.forEach(q => { if (/^(q-new|ai-q|demo-q)-/.test(q.id)) save('questions', q) })
+  prepared.forEach(q => { if (/^(q-new|ai-q|demo-q|import-q)-/.test(q.id)) save('questions', q) })
   save('exams', exam)
   if (selectedClasses.length > 0 && startDate && startTime && endDate && endTime) {
     selectedClasses.forEach(classId => save('examAssignments', { id: `assignment-${Date.now()}-${classId}`, examId: exam.id, classId, assignedBy: CURRENT_TEACHER_ID, scheduledStart: `${startDate}T${startTime}`, scheduledEnd: `${endDate}T${endTime}`, isPaused: false, extendedMinutes: 0, status: 'scheduled' }))
