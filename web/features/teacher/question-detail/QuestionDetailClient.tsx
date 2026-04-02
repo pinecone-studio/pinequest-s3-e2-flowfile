@@ -45,7 +45,7 @@ export function QuestionDetailClient({ params }: { params: Promise<{ id: string 
         <ChevronLeft size={16} strokeWidth={1.5} />Шалгалтын сан руу буцах
       </Link>
 
-      <ExamBanner exam={exam} subject={subject} owner={owner} subjectColor={subjectColor} isOwner={isOwner} />
+      <ExamBanner exam={exam} subject={subject} subjectColor={subjectColor} isOwner={isOwner} />
 
       <div className="grid grid-cols-4 gap-4 mb-6">
         {[
