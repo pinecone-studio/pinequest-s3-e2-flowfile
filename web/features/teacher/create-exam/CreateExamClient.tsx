@@ -84,12 +84,20 @@ export function CreateExamClient() {
     const files = fileList ? Array.from(fileList) : []; if (!files.length) return
     setImportingFile(true); setImportFileName(files.length === 1 ? files[0].name : `${files.length} файл`)
     try {
-      const { collected, skipped, usedLocalParser } = await processImportFiles(files, title, selectedCourseLabel)
+      const { collected, skipped, failures, usedLocalParser } = await processImportFiles(files, title, selectedCourseLabel)
       const imported = mapImportedQuestions(collected, questions.length)
       if (!imported.length) throw new Error('Сонгосон файл эсвэл хавтсаас асуулт олдсонгүй.')
-      setQuestions([...questions, ...imported]); setQuestionTab('new')
+      setQuestions(prev => [...prev, ...imported]); setQuestionTab('new')
       const parts = [`${imported.length} асуулт нэмэгдлээ.`, usedLocalParser && 'API key байхгүй тул локал parser ашиглалаа.', skipped.length && `${skipped.length} файл алгасагдлаа.`].filter(Boolean).join(' ')
       toast({ title: 'Импорт амжилттай', description: parts })
+      if (failures.length > 0) {
+        const firstFailure = failures[0]
+        toast({
+          variant: 'destructive',
+          title: `${failures.length} файл алгасагдлаа`,
+          description: `${firstFailure.fileName}: ${firstFailure.reason}`,
+        })
+      }
     } catch (err) { toast({ variant: 'destructive', title: 'Импорт амжилтгүй боллоо', description: err instanceof Error ? err.message : 'Дахин оролдоно уу.' })
     } finally { setImportingFile(false); setImportFileName('') }
   }
@@ -126,7 +134,7 @@ export function CreateExamClient() {
         <div className="flex-1 overflow-y-auto p-8">
           {currentStep === 1 && <StepSource source={source} onChange={setSource} />}
           {currentStep === 2 && <StepBasicInfo title={title} courseId={courseId} chapter={chapter} topic={topic} description={description} duration={duration} visibility={visibility} courses={courses} onTitle={setTitle} onCourseId={setCourseId} onChapter={setChapter} onTopic={setTopic} onDescription={setDescription} onDuration={setDuration} onVisibility={setVisibility} onDemo={handleFillGeneralInfoDemo} />}
-          {currentStep === 3 && <StepQuestions questions={questions} questionTab={questionTab} questionText={questionText} questionType={questionType} questionOptions={questionOptions} correctAnswer={correctAnswer} questionPoints={questionPoints} bankSearchQuery={bankSearchQuery} selectedBankQuestions={selectedBankQuestions} filteredBankQuestions={filteredBankQuestions} aiTopic={aiTopic} aiDifficulty={aiDifficulty} aiCount={aiCount} aiGenerating={aiGenerating} aiGeneratedQuestions={aiGeneratedQuestions} importingFile={importingFile} importFileName={importFileName} onQuestionTab={setQuestionTab} onQuestionText={setQuestionText} onQuestionType={setQuestionType} onQuestionOptions={setQuestionOptions} onCorrectAnswer={setCorrectAnswer} onQuestionPoints={setQuestionPoints} onBankSearchQuery={setBankSearchQuery} onSelectedBankQuestions={setSelectedBankQuestions} onAddQuestion={handleAddQuestion} onAddFromBank={handleAddFromBank} onAiTopic={setAiTopic} onAiDifficulty={setAiDifficulty} onAiCount={setAiCount} onAiGenerate={handleAiGenerate} onAddAiQuestions={handleAddAiQuestions} onFileUpload={handleFileUpload} onFolderUpload={handleFolderUpload} onDemo={handleAddDemoQuestions} />}
+          {currentStep === 3 && <StepQuestions questionTab={questionTab} questionText={questionText} questionType={questionType} questionOptions={questionOptions} correctAnswer={correctAnswer} questionPoints={questionPoints} bankSearchQuery={bankSearchQuery} selectedBankQuestions={selectedBankQuestions} filteredBankQuestions={filteredBankQuestions} aiTopic={aiTopic} aiDifficulty={aiDifficulty} aiCount={aiCount} aiGenerating={aiGenerating} aiGeneratedQuestions={aiGeneratedQuestions} importingFile={importingFile} importFileName={importFileName} onQuestionTab={setQuestionTab} onQuestionText={setQuestionText} onQuestionType={setQuestionType} onQuestionOptions={setQuestionOptions} onCorrectAnswer={setCorrectAnswer} onQuestionPoints={setQuestionPoints} onBankSearchQuery={setBankSearchQuery} onSelectedBankQuestions={setSelectedBankQuestions} onAddQuestion={handleAddQuestion} onAddFromBank={handleAddFromBank} onAiTopic={setAiTopic} onAiDifficulty={setAiDifficulty} onAiCount={setAiCount} onAiGenerate={handleAiGenerate} onAddAiQuestions={handleAddAiQuestions} onFileUpload={handleFileUpload} onFolderUpload={handleFolderUpload} onDemo={handleAddDemoQuestions} />}
           {currentStep === 4 && <StepSchedule courseId={courseId} selectedClasses={selectedClasses} startDate={startDate} startTime={startTime} endDate={endDate} endTime={endTime} availableClasses={availableClasses} onSelectedClasses={setSelectedClasses} onStartDate={setStartDate} onStartTime={setStartTime} onEndDate={setEndDate} onEndTime={setEndTime} />}
         </div>
         <div className="px-8 py-4 bg-white border-t border-card-border flex items-center justify-between">
