@@ -47,6 +47,55 @@ export class SessionRepository {
     return session;
   }
 
+  async saveOfflineSession(data: {
+    id: string;
+    examId: string;
+    studentId: string;
+    status: SessionStatus;
+    startedAt: string | null;
+    submittedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }) {
+    const existing = await this.findSessionByStudentAndExam(
+      data.studentId,
+      data.examId,
+    );
+
+    if (existing) {
+      const [session] = await db
+        .update(examSessions)
+        .set({
+          status: data.status,
+          startedAt: data.startedAt,
+          submittedAt: data.submittedAt,
+          updatedAt: data.updatedAt,
+        })
+        .where(eq(examSessions.id, existing.id))
+        .returning();
+
+      return session;
+    }
+
+    const [session] = await db
+      .insert(examSessions)
+      .values({
+        id: data.id,
+        examId: data.examId,
+        studentId: data.studentId,
+        status: data.status,
+        startedAt: data.startedAt,
+        submittedAt: data.submittedAt,
+        score: null,
+        isFlagged: false,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      })
+      .returning();
+
+    return session;
+  }
+
   async updateSessionStatus(id: string, status: SessionStatus) {
     const now = new Date().toISOString();
     const [session] = await db
@@ -89,6 +138,24 @@ export class SessionRepository {
         status,
         submittedAt: now,
         updatedAt: now,
+      })
+      .where(eq(examSessions.id, id))
+      .returning();
+
+    return session;
+  }
+
+  async submitSessionAt(
+    id: string,
+    submittedAt: string,
+    status: Extract<SessionStatus, 'submitted' | 'force_submitted'>,
+  ) {
+    const [session] = await db
+      .update(examSessions)
+      .set({
+        status,
+        submittedAt,
+        updatedAt: submittedAt,
       })
       .where(eq(examSessions.id, id))
       .returning();
