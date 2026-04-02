@@ -15,14 +15,13 @@ export class AdminDashboardResolver {
   async getAdminDashboard(
     @Args('limit', { type: () => Int, nullable: true }) limit = 10,
   ) {
-    const [exams, dashboardStats] = await Promise.all([
+    const [exams, allSessions, dashboardStats] = await Promise.all([
       this.examService.getAllExams(),
+      this.sessionService.getAllSessions(),
       this.monitoringService.getDashboardStats(limit),
     ]);
 
-    const sessionsByExam = await Promise.all(
-      exams.map((exam) => this.sessionService.getSessionsByExam(exam.id)),
-    );
+    const totalSessions = allSessions.length;
 
     return {
       totalExams: exams.length,
@@ -30,7 +29,7 @@ export class AdminDashboardResolver {
         .length,
       totalPublishedExams: exams.filter((exam) => exam.status === 'published')
         .length,
-      totalSessions: sessionsByExam.flat().length,
+      totalSessions,
       totalSuspiciousEvents: dashboardStats.totalEvents,
       recentEvents: dashboardStats.recentEvents,
     };
