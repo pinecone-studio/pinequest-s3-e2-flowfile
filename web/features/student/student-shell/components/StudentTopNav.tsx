@@ -14,8 +14,8 @@ type StudentTopNavProps = {
 
 export function StudentTopNav({ pathname, navLinks, studentDisplayName }: StudentTopNavProps) {
   return (
-    <nav className="h-14 bg-white border-b border-card-border flex items-center justify-between px-6">
-      <div className="flex items-center gap-8">
+    <nav className="fixed inset-x-0 top-9 z-30 flex flex-col gap-3 border-b border-card-border bg-white px-4 py-3 md:h-14 md:flex-row md:items-center md:justify-between md:px-6 md:py-0">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-8">
         <Link href="/student" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
             <span className="text-primary text-[14px] font-bold">e</span>
@@ -23,7 +23,7 @@ export function StudentTopNav({ pathname, navLinks, studentDisplayName }: Studen
           <span className="text-[15px] font-semibold" style={{ color: '#216ad7' }}>е-shalgalt</span>
         </Link>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 md:overflow-visible md:pb-0">
           {navLinks.map((link) => {
             const Icon = link.icon
             const isActive = pathname === link.href
