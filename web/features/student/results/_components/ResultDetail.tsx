@@ -23,6 +23,19 @@ export function ResultDetail({
   examQuestions: Question[]
 }) {
   if (!selectedResult || !selectedExam) {
+    if (selectedAttempt && selectedExam) {
+      return (
+        <div className="rounded-xl border border-card-border bg-white p-8 text-center md:p-16">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
+            <TrendingUp size={32} className="text-blue-600" strokeWidth={1.5} />
+          </div>
+          <h3 className="mb-2 text-[18px] font-bold text-foreground">Шалгалт илгээгдсэн</h3>
+          <p className="mb-1 text-[14px] text-text-secondary">Багш шалгаж дуусах хүртэл энэ хэсэгт хүлээгдэж буй төлөв харагдана.</p>
+          <p className="text-[13px] text-text-secondary">Шалгалт: {selectedExam.title}</p>
+        </div>
+      )
+    }
+
     return (
       <div className="bg-white border border-card-border rounded-xl p-16 text-center">
         <TrendingUp size={48} className="mx-auto text-card-border mb-3" strokeWidth={1} />
@@ -33,12 +46,12 @@ export function ResultDetail({
 
   if (!selectedResult.isPublished) {
     return (
-      <div className="bg-white border border-card-border rounded-xl p-16 text-center">
+      <div className="bg-white border border-card-border rounded-xl p-8 text-center md:p-16">
         <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
           <LockKeyhole size={32} className="text-amber-600" strokeWidth={1.5} />
         </div>
-        <h3 className="text-[18px] font-bold text-foreground mb-2">Үр дүн нийтлэгдээгүй</h3>
-        <p className="text-[14px] text-text-secondary mb-1">Багш үр дүнг нийтлэх хүртэл хүлээнэ үү.</p>
+        <h3 className="text-[18px] font-bold text-foreground mb-2">Шалгаж байна</h3>
+        <p className="text-[14px] text-text-secondary mb-1">Багш шалгалтыг засаж дуусмагц энд үр дүн харагдана.</p>
         <p className="text-[13px] text-text-secondary">Шалгалт: {selectedExam.title}</p>
       </div>
     )
@@ -52,7 +65,7 @@ export function ResultDetail({
   return (
     <div className="space-y-6">
       <div className="bg-white border border-card-border rounded-xl p-6">
-        <div className="flex items-center gap-8">
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:gap-8">
           <div className="relative w-36 h-36">
             <svg className="w-full h-full -rotate-90">
               <circle cx="72" cy="72" r="64" fill="none" stroke="#E8EBF0" strokeWidth="10" />
@@ -68,7 +81,7 @@ export function ResultDetail({
           <div className="flex-1">
             <h3 className="text-[18px] font-bold text-foreground mb-1">{selectedExam.title}</h3>
             <p className="text-[13px] text-text-secondary mb-4">{selectedExam.subjectId}</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <div className="text-[12px] text-text-secondary mb-1">Нийт оноо</div>
                 <div className="text-[16px] font-semibold text-foreground">{selectedResult.totalScore} / {selectedResult.maxScore}</div>
