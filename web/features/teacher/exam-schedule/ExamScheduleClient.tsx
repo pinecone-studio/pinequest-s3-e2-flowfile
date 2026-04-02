@@ -17,7 +17,7 @@ const monthNames = ['1-р сар', '2-р сар', '3-р сар', '4-р сар', 
 export function ExamScheduleClient() {
   const [exams, setExams] = useState<Exam[]>(initialExams)
   const [assignments, setAssignments] = useState<ExamAssignment[]>(initialExamAssignments)
-  const [classes, setClasses] = useState(initialClasses)
+  const [classes] = useState(initialClasses)
   const [viewMode, setViewMode] = useState<ViewMode>('month')
   const [currentDate, setCurrentDate] = useState(() => new Date(INITIAL_TIMESTAMP))
   const [selectedEvent, setSelectedEvent] = useState<{ assignment: ExamAssignment; exam: Exam; position: { x: number; y: number } } | null>(null)
@@ -93,7 +93,7 @@ export function ExamScheduleClient() {
         {viewMode === 'month' && <CalendarGrid days={getMonthDays()} getExam={getExam} getEventsForDate={getEventsForDate} isToday={isToday} onEventClick={handleEventClick} />}
         {viewMode === 'week' && <WeekView weekDays={getWeekDays()} getEventsForDate={getEventsForDate} getExam={getExam} isToday={isToday} handleEventClick={handleEventClick} formatTime={formatTime} />}
       </div>
-      {selectedEvent && <EventPopup event={selectedEvent} getClass={getClass} onClose={() => setSelectedEvent(null)} />}
+      {selectedEvent && <EventPopup event={selectedEvent} getClass={getClass} />}
     </div>
   )
 }
