@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { CURRENT_TEACHER_ID, getAll } from '@/lib/data'
 import type { Course, Exam, Question, Subject, User } from '@/lib/types'
 import { initialCourses, initialExams, initialQuestions, initialSubjects, initialUsers } from '@/lib/data'
@@ -12,6 +13,7 @@ import { QuestionBankSlideOver } from './_components/QuestionBankItem'
 type LegacyExam = Exam & { courseId?: string }
 
 export function QuestionBankClient() {
+  const router = useRouter()
   const [exams, setExams] = useState<LegacyExam[]>(initialExams)
   const [courses, setCourses] = useState<Course[]>(initialCourses)
   const [questions, setQuestions] = useState<Question[]>(initialQuestions)
@@ -22,6 +24,7 @@ export function QuestionBankClient() {
   const [yearFilter, setYearFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedExam, setSelectedExam] = useState<LegacyExam | null>(null)
+  const [printExam, setPrintExam] = useState<LegacyExam | null>(null)
 
   useEffect(() => {
     const loadedExams = getAll<LegacyExam>('exams')
@@ -48,6 +51,19 @@ export function QuestionBankClient() {
   const getTotalPoints = (exam: Exam) => getExamQuestions(exam).reduce((sum, q) => sum + q.points, 0)
   const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('mn-MN', { year: 'numeric', month: 'short', day: 'numeric' })
 
+  useEffect(() => {
+    if (!printExam) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      window.print()
+      setPrintExam(null)
+    }, 150)
+
+    return () => window.clearTimeout(timeout)
+  }, [printExam])
+
   const yearOptions = Array.from(new Set(exams.map(exam => exam.createdAt.slice(0, 4)))).sort((a, b) => Number(b) - Number(a))
   const availableSubjects = subjects.filter(subject => exams.some(exam => getExamSubjectId(exam) === subject.id))
 
@@ -62,20 +78,22 @@ export function QuestionBankClient() {
   })
 
   return (
-    <div className="p-6">
-      <h1 className="text-[22px] font-semibold text-foreground mb-6">Шалгалтын сан</h1>
-      <QuestionBankFilters
-        selectedSubject={selectedSubject}
-        onSubjectChange={setSelectedSubject}
-        ownerFilter={ownerFilter}
-        onOwnerChange={setOwnerFilter}
-        yearFilter={yearFilter}
-        onYearChange={setYearFilter}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        availableSubjects={availableSubjects}
-        yearOptions={yearOptions}
-      />
+    <div className="p-4 md:p-6">
+      <div className="pb-4">
+        <h1 className="mb-6 text-[22px] font-semibold text-foreground">Шалгалтын сан</h1>
+        <QuestionBankFilters
+          selectedSubject={selectedSubject}
+          onSubjectChange={setSelectedSubject}
+          ownerFilter={ownerFilter}
+          onOwnerChange={setOwnerFilter}
+          yearFilter={yearFilter}
+          onYearChange={setYearFilter}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          availableSubjects={availableSubjects}
+          yearOptions={yearOptions}
+        />
+      </div>
       <div className="bg-white border border-card-border rounded-md overflow-hidden">
         {filteredExams.map(exam => {
           const subjectName = getExamSubjectName(exam)
@@ -97,8 +115,11 @@ export function QuestionBankClient() {
               totalPoints={getTotalPoints(exam)}
               visibility={exam.visibility as 'private' | 'school'}
               onView={() => setSelectedExam(exam)}
-              onAssign={() => {}}
-              onPrint={() => {}}
+              onAssign={() => router.push(`/teacher/schedule?examId=${exam.id}`)}
+              onPrint={() => {
+                setSelectedExam(exam)
+                setPrintExam(exam)
+              }}
             />
           )
         })}
@@ -114,6 +135,22 @@ export function QuestionBankClient() {
           getExamQuestions={getExamQuestions}
           formatDate={formatDate}
         />
+      )}
+      {printExam && (
+        <div className="hidden print:block p-8">
+          <h1 className="mb-2 text-2xl font-bold">{printExam.title}</h1>
+          <div className="mb-4 text-sm text-slate-600">
+            {getExamSubjectName(printExam)} • {formatDate(printExam.createdAt)} • {getTotalPoints(printExam)} оноо
+          </div>
+          <div className="space-y-4">
+            {getExamQuestions(printExam).map((question, index) => (
+              <div key={question.id} className="break-inside-avoid rounded-lg border border-slate-300 p-4">
+                <div className="mb-2 text-sm font-semibold">Асуулт {index + 1}</div>
+                <div className="text-sm">{question.text}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )
