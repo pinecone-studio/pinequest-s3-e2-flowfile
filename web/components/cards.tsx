@@ -72,7 +72,6 @@ function getAbbreviation(name: string): string {
 
 // =============== COURSE CARD ===============
 interface CourseCardProps {
-  id: string
   name: string
   grade: string
   year: string
@@ -83,7 +82,7 @@ interface CourseCardProps {
   href: string
 }
 
-export function CourseCard({ id, name, grade, year, term, teacherName, classCount, examCount, href }: CourseCardProps) {
+export function CourseCard({ name, grade, year, term, teacherName, classCount, examCount, href }: CourseCardProps) {
   const colors = getSubjectColor(name)
   
   return (
@@ -158,7 +157,6 @@ export function CourseCard({ id, name, grade, year, term, teacherName, classCoun
 
 // =============== CLASS CARD ===============
 interface ClassCardProps {
-  id: string
   name: string
   fullName: string
   schedule: string
@@ -169,7 +167,7 @@ interface ClassCardProps {
   href: string
 }
 
-export function ClassCard({ id, name, fullName, schedule, studentCount, upcomingExamCount, courseColor, coursePattern, href }: ClassCardProps) {
+export function ClassCard({ name, fullName, schedule, studentCount, upcomingExamCount, courseColor, coursePattern, href }: ClassCardProps) {
   return (
     <Link
       href={href}
@@ -243,7 +241,6 @@ const EXAM_STATUS_COLORS: Record<string, string> = {
 }
 
 interface ExamCardUpcomingProps {
-  id: string
   title: string
   subjectName: string
   status: 'scheduled' | 'active' | 'closed' | 'draft'
@@ -252,13 +249,12 @@ interface ExamCardUpcomingProps {
   questionCount: number
   studentCount: number
   href: string
-  actionLabel?: string
   actionHref?: string
   isStudent?: boolean
 }
 
 export function ExamCardUpcoming({ 
-  id, title, subjectName, status, duration, dateTime, questionCount, studentCount, href, actionLabel, actionHref, isStudent 
+  title, subjectName, status, duration, dateTime, questionCount, studentCount, href, actionHref, isStudent 
 }: ExamCardUpcomingProps) {
   const statusLabels: Record<string, string> = {
     scheduled: 'Товлогдсон',
@@ -352,7 +348,6 @@ export function ExamCardUpcoming({
 
 // =============== EXAM CARD (PAST) ===============
 interface ExamCardPastProps {
-  id: string
   title: string
   subjectName: string
   averageScore: number | null
@@ -362,7 +357,7 @@ interface ExamCardPastProps {
   href: string
 }
 
-export function ExamCardPast({ id, title, subjectName, averageScore, completionRate, completedCount, totalCount, href }: ExamCardPastProps) {
+export function ExamCardPast({ title, subjectName, averageScore, completionRate, completedCount, totalCount, href }: ExamCardPastProps) {
   const coverColor = '#0A2D6E'
   const pattern = COURSE_COLORS.default.pattern
   
@@ -452,7 +447,7 @@ interface ExamBankCardProps {
 }
 
 export function ExamBankCard({ 
-  id, title, subjectName, subjectColor, subjectPattern, chapter, topic, ownerName, createdAt, questionCount, totalPoints, visibility, onView, onAssign, onPrint 
+  title, subjectName, subjectColor, subjectPattern, chapter, topic, ownerName, createdAt, questionCount, totalPoints, visibility, onView, onAssign, onPrint 
 }: ExamBankCardProps) {
   return (
     <div className="group flex overflow-hidden border-b border-[#DDE1E7] last:border-b-0 hover:bg-[#FAFBFC] transition-colors">
@@ -522,7 +517,7 @@ export function ExamBankCard({
         </div>
         
         {/* Actions */}
-        <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-3 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
           <button 
             onClick={onView}
             className="flex items-center gap-1 text-[12px] text-[#1550A8] hover:underline"
@@ -552,7 +547,6 @@ export function ExamBankCard({
 
 // =============== STUDENT EXAM CARD ===============
 interface StudentExamCardProps {
-  id: string
   title: string
   subjectName: string
   status: 'scheduled' | 'active' | 'closed' | 'completed'
@@ -562,7 +556,7 @@ interface StudentExamCardProps {
   href: string
 }
 
-export function StudentExamCard({ id, title, subjectName, status, duration, dateTime, teacherName, href }: StudentExamCardProps) {
+export function StudentExamCard({ title, subjectName, status, duration, dateTime, teacherName, href }: StudentExamCardProps) {
   const statusLabels: Record<string, string> = {
     scheduled: 'Эхлээгүй',
     active: 'Идэвхтэй',
