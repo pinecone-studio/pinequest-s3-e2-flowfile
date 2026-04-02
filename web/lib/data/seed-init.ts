@@ -42,6 +42,10 @@ export function initializeData(): void {
   mergeSeedItems('submissions', seedSubmissions)
   mergeSeedItems('results', seedResults)
 
+  if (getAll('notifications').length === 0) {
+    localStorage.setItem('notifications', JSON.stringify([]))
+  }
+
   if (getAll<Schedule>('schedules').length === 0) {
     localStorage.setItem('schedules', JSON.stringify(seedSchedules))
   }

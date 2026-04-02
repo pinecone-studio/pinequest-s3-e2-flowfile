@@ -78,13 +78,13 @@ export interface Question {
   examId: string
   text: string
   imageUrl?: string
-  type: 'single' | 'multiple' | 'truefalse' | 'matching' | 'short' | 'long' | 'formula' | 'code'
+  type: 'single' | 'multiple' | 'truefalse' | 'matching' | 'short' | 'long' | 'formula' | 'chemistry' | 'code' | 'voice' | 'video' | 'handwritten'
   options?: string[]
   matchingPairs?: { left: string; right: string }[]
   correctAnswer?: string | string[]
   points: number
   order: number
-  isManualGrade: boolean   // short, long, formula, code = true
+  isManualGrade: boolean
 }
 
 export interface ExamAssignment {
@@ -158,6 +158,20 @@ export interface Result {
   submittedAt?: string
 }
 
+export type AppNotificationType = 'exam_assigned' | 'exam_started' | 'exam_submitted' | 'suspicious_event' | 'result_published'
+
+export interface AppNotification {
+  id: string
+  recipientId: string
+  title: string
+  body: string
+  type: AppNotificationType
+  examId?: string
+  classId?: string
+  isRead: boolean
+  createdAt: string
+}
+
 export type QuestionType = Question['type']
 
 export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
@@ -168,7 +182,11 @@ export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   short: 'Богино текст',
   long: 'Урт текст',
   formula: 'Томъёо',
-  code: 'Код'
+  chemistry: 'Химийн томъёо',
+  code: 'CodeMirror код',
+  voice: 'Дуу бичлэг',
+  video: 'Видео хариулт',
+  handwritten: 'Гараар зурсан/медиа',
 }
 
 // Permission system
