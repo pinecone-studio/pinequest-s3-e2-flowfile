@@ -3,9 +3,10 @@ import { DatabaseModule } from 'src/database/database.module';
 import { ExamService } from './exam.service';
 import { ExamController } from './exam.controller';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule],
+  imports: [DatabaseModule, AuthModule, NotificationModule],
   providers: [ExamService],
   controllers: [ExamController],
   exports: [ExamService],
