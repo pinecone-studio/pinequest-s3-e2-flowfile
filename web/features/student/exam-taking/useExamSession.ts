@@ -439,10 +439,11 @@ export function useExamSession(id: string) {
         examId: exam.id,
         examTitle: exam.title,
         assignmentId: assignmentIdRef.current ?? exam.id,
+        sessionId: sessionId ?? undefined,
         type,
       }).catch(() => null)
     },
-    [currentStudentId, currentStudentName, exam, isApiBacked],
+    [currentStudentId, currentStudentName, exam, isApiBacked, sessionId],
   )
 
   const formatTime = (seconds: number) => {

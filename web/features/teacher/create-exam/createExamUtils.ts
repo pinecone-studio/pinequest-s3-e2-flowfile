@@ -1,6 +1,7 @@
 import type { Course, Question, Exam, QuestionType } from '@/lib/types'
 import { SUBJECT_NAMES } from '@/lib/constants'
 import { CURRENT_TEACHER_ID, save } from '@/lib/data'
+import { buildExamAssignmentNotifications, saveNotifications } from '@/lib/notifications'
 import { getApiUrl } from '@/lib/api/client'
 
 export type ImportedQuestionPayload = {
@@ -11,7 +12,7 @@ export type ImportApiResponse = { questions?: ImportedQuestionPayload[]; parser?
 export type ImportFailure = { fileName: string; reason: string }
 
 export const stepLabels = ['Эх сурвалж', 'Ерөнхий мэдээлэл', 'Асуултууд', 'Хуваарь']
-const MANUAL_QUESTION_TYPES: QuestionType[] = ['short', 'long', 'formula', 'code']
+const MANUAL_QUESTION_TYPES: QuestionType[] = ['short', 'long', 'formula', 'chemistry', 'code', 'voice', 'video', 'handwritten']
 
 function getDevAuthHeaders() {
   if (typeof window === 'undefined') {
@@ -143,8 +144,9 @@ export function saveExamPayload(params: {
   questions: Question[]; title: string; selectedCourse: Course; chapter: string; topic: string
   description: string; duration: number; totalPoints: number; visibility: 'private' | 'school'
   selectedClasses: string[]; startDate: string; startTime: string; endDate: string; endTime: string
+  classes: { id: string; name: string; studentIds: string[] }[]
 }) {
-  const { questions, title, selectedCourse, chapter, topic, description, duration, totalPoints, visibility, selectedClasses, startDate, startTime, endDate, endTime } = params
+  const { questions, title, selectedCourse, chapter, topic, description, duration, totalPoints, visibility, selectedClasses, startDate, startTime, endDate, endTime, classes } = params
   const now = new Date().toISOString(); const newExamId = `exam-${Date.now()}`
   const prepared = questions.map((q, i) => ({ ...q, examId: newExamId, order: i + 1, isManualGrade: isManualQuestionType(q.type) }))
   const exam: Exam = { id: newExamId, title, subjectId: selectedCourse.subjectId, grade: selectedCourse.grade, chapter: chapter || undefined, topic: topic || undefined, description: description || undefined, duration, totalPoints, ownerType: 'teacher', visibility, ownerId: CURRENT_TEACHER_ID, collaboratorIds: [], createdAt: now, updatedAt: now, questionIds: prepared.map(q => q.id), status: selectedClasses.length > 0 ? 'published' : 'draft', isTemplate: false, tags: [selectedCourse.subjectId, chapter, topic].filter(Boolean) as string[] }
@@ -152,5 +154,9 @@ export function saveExamPayload(params: {
   save('exams', exam)
   if (selectedClasses.length > 0 && startDate && startTime && endDate && endTime) {
     selectedClasses.forEach(classId => save('examAssignments', { id: `assignment-${Date.now()}-${classId}`, examId: exam.id, classId, assignedBy: CURRENT_TEACHER_ID, scheduledStart: `${startDate}T${startTime}`, scheduledEnd: `${endDate}T${endTime}`, isPaused: false, extendedMinutes: 0, status: 'scheduled' }))
+    saveNotifications(buildExamAssignmentNotifications({
+      exam,
+      selectedClasses: classes.filter((schoolClass) => selectedClasses.includes(schoolClass.id)),
+    }))
   }
 }

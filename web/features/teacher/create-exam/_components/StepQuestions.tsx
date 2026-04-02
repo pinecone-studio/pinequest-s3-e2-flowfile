@@ -11,21 +11,23 @@ type QuestionTab = 'new' | 'bank' | 'ai' | 'file'
 
 export function StepQuestions({
   questionTab, questionText, questionType, questionOptions, correctAnswer, questionPoints,
+  matchingPairs,
   bankSearchQuery, selectedBankQuestions, filteredBankQuestions,
   aiTopic, aiDifficulty, aiCount, aiGenerating, aiGeneratedQuestions,
   importingFile, importFileName,
-  onQuestionTab, onQuestionText, onQuestionType, onQuestionOptions, onCorrectAnswer, onQuestionPoints,
+  onQuestionTab, onQuestionText, onQuestionType, onQuestionOptions, onCorrectAnswer, onQuestionPoints, onMatchingPairs,
   onBankSearchQuery, onSelectedBankQuestions, onAddQuestion, onAddFromBank,
   onAiTopic, onAiDifficulty, onAiCount, onAiGenerate, onAddAiQuestions,
   onFileUpload, onFolderUpload, onDemo,
 }: {
   questionTab: QuestionTab; questionText: string; questionType: QuestionType
   questionOptions: string[]; correctAnswer: string | string[]; questionPoints: number
+  matchingPairs: { left: string; right: string }[]
   bankSearchQuery: string; selectedBankQuestions: string[]; filteredBankQuestions: Question[]
   aiTopic: string; aiDifficulty: 'easy' | 'medium' | 'hard'; aiCount: number; aiGenerating: boolean; aiGeneratedQuestions: Question[]
   importingFile: boolean; importFileName: string
   onQuestionTab: (tab: QuestionTab) => void; onQuestionText: (v: string) => void; onQuestionType: (v: QuestionType) => void
-  onQuestionOptions: (v: string[]) => void; onCorrectAnswer: (v: string | string[]) => void; onQuestionPoints: (v: number) => void
+  onQuestionOptions: (v: string[]) => void; onCorrectAnswer: (v: string | string[]) => void; onQuestionPoints: (v: number) => void; onMatchingPairs: (pairs: { left: string; right: string }[]) => void
   onBankSearchQuery: (v: string) => void; onSelectedBankQuestions: (ids: string[]) => void
   onAddQuestion: () => void; onAddFromBank: () => void
   onAiTopic: (v: string) => void; onAiDifficulty: (v: 'easy' | 'medium' | 'hard') => void; onAiCount: (v: number) => void
@@ -52,7 +54,7 @@ export function StepQuestions({
           </button>
         ))}
       </div>
-      {questionTab === 'new' && <QuestionTabNew questionText={questionText} questionType={questionType} questionOptions={questionOptions} correctAnswer={correctAnswer} questionPoints={questionPoints} onQuestionText={onQuestionText} onQuestionType={onQuestionType} onQuestionOptions={onQuestionOptions} onCorrectAnswer={onCorrectAnswer} onQuestionPoints={onQuestionPoints} onAddQuestion={onAddQuestion} />}
+      {questionTab === 'new' && <QuestionTabNew questionText={questionText} questionType={questionType} questionOptions={questionOptions} correctAnswer={correctAnswer} questionPoints={questionPoints} matchingPairs={matchingPairs} onQuestionText={onQuestionText} onQuestionType={onQuestionType} onQuestionOptions={onQuestionOptions} onCorrectAnswer={onCorrectAnswer} onQuestionPoints={onQuestionPoints} onMatchingPairs={onMatchingPairs} onAddQuestion={onAddQuestion} />}
       {questionTab === 'bank' && <QuestionTabBank bankSearchQuery={bankSearchQuery} selectedBankQuestions={selectedBankQuestions} filteredBankQuestions={filteredBankQuestions} onBankSearchQuery={onBankSearchQuery} onSelectedBankQuestions={onSelectedBankQuestions} onAddFromBank={onAddFromBank} />}
       {questionTab === 'ai' && <QuestionTabAI aiTopic={aiTopic} aiDifficulty={aiDifficulty} aiCount={aiCount} aiGenerating={aiGenerating} aiGeneratedQuestions={aiGeneratedQuestions} onAiTopic={onAiTopic} onAiDifficulty={onAiDifficulty} onAiCount={onAiCount} onAiGenerate={onAiGenerate} onAddAiQuestions={onAddAiQuestions} />}
       {questionTab === 'file' && <QuestionTabFile importingFile={importingFile} importFileName={importFileName} onFileUpload={onFileUpload} onFolderUpload={onFolderUpload} />}

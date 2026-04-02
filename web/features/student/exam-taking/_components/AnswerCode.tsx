@@ -26,9 +26,12 @@ export function AnswerCode({
 }) {
   return (
     <div className="space-y-3 rounded-xl border border-card-border bg-white p-4">
+      <div className="rounded-xl bg-[#EEF5FF] px-3 py-2 text-[12px] text-text-secondary">
+        CodeMirror editor нь утсан дээр жижиг дэлгэцэд таарсан өндөртэй харагдана. Код нь plain text хэлбэрээр хадгалагдана.
+      </div>
       <CodeMirror
         value={value}
-        height="260px"
+        height="240px"
         theme="light"
         extensions={[javascript()]}
         onChange={onChange}
