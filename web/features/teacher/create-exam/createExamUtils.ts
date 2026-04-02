@@ -2,7 +2,8 @@ import type { Course, Question, Exam, QuestionType } from '@/lib/types'
 import { SUBJECT_NAMES } from '@/lib/constants'
 import { CURRENT_TEACHER_ID, save } from '@/lib/data'
 import { buildExamAssignmentNotifications, saveNotifications } from '@/lib/notifications'
-import { getApiUrl } from '@/lib/api/client'
+import { getApiUrl, isApiConfigured } from '@/lib/api/client'
+import { createExam, createQuestion } from '@/lib/api/teacher-exams'
 
 export type ImportedQuestionPayload = {
   question?: string; type?: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay'
@@ -140,13 +141,52 @@ export function generateDemoQuestions(subjectName: string, existingCount: number
   ]
 }
 
-export function saveExamPayload(params: {
+export async function saveExamPayload(params: {
   questions: Question[]; title: string; selectedCourse: Course; chapter: string; topic: string
   description: string; duration: number; totalPoints: number; visibility: 'private' | 'school'
   selectedClasses: string[]; startDate: string; startTime: string; endDate: string; endTime: string
   classes: { id: string; name: string; studentIds: string[] }[]
 }) {
   const { questions, title, selectedCourse, chapter, topic, description, duration, totalPoints, visibility, selectedClasses, startDate, startTime, endDate, endTime, classes } = params
+
+  if (isApiConfigured()) {
+    try {
+      const startsAt = startDate && startTime ? `${startDate}T${startTime}` : undefined
+      const endsAt = endDate && endTime ? `${endDate}T${endTime}` : undefined
+      const result = await createExam({
+        title,
+        subject: selectedCourse.subjectId || 'МАТ',
+        durationMinutes: duration,
+        shuffleQuestions: false,
+        allowCopyPaste: false,
+        requireFullscreen: true,
+        maxTabSwitches: 3,
+        startsAt,
+        endsAt,
+      })
+      for (const [i, q] of questions.entries()) {
+        const inputType = q.type === 'single' || q.type === 'multiple' ? 'mcq' :
+          q.type === 'short' || q.type === 'truefalse' ? 'short_text' :
+          q.type === 'long' ? 'rich_text' :
+          q.type === 'formula' ? 'math_formula' :
+          q.type === 'chemistry' ? 'chem_formula' :
+          q.type === 'voice' ? 'voice_record' : 'rich_text'
+        await createQuestion(result.id, {
+          content: q.text,
+          inputType,
+          points: q.points,
+          orderIndex: i + 1,
+          isRequired: true,
+          optionsJson: q.options ? JSON.stringify(q.options) : undefined,
+          correctAnswer: typeof q.correctAnswer === 'string' ? q.correctAnswer : undefined,
+        })
+      }
+      return result
+    } catch {
+      // fall through to local save
+    }
+  }
+
   const now = new Date().toISOString(); const newExamId = `exam-${Date.now()}`
   const prepared = questions.map((q, i) => ({ ...q, examId: newExamId, order: i + 1, isManualGrade: isManualQuestionType(q.type) }))
   const exam: Exam = { id: newExamId, title, subjectId: selectedCourse.subjectId, grade: selectedCourse.grade, chapter: chapter || undefined, topic: topic || undefined, description: description || undefined, duration, totalPoints, ownerType: 'teacher', visibility, ownerId: CURRENT_TEACHER_ID, collaboratorIds: [], createdAt: now, updatedAt: now, questionIds: prepared.map(q => q.id), status: selectedClasses.length > 0 ? 'published' : 'draft', isTemplate: false, tags: [selectedCourse.subjectId, chapter, topic].filter(Boolean) as string[] }
