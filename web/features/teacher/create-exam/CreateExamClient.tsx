@@ -118,9 +118,9 @@ export function CreateExamClient() {
     setQuestions([...questions, ...generateDemoQuestions(sn, questions.length)])
   }
 
-  const handleSaveExam = () => {
+  const handleSaveExam = async () => {
     if (!selectedCourse) return
-    saveExamPayload({ questions, title, selectedCourse, chapter, topic, description, duration, totalPoints, visibility, selectedClasses, startDate, startTime, endDate, endTime, classes })
+    await saveExamPayload({ questions, title, selectedCourse, chapter, topic, description, duration, totalPoints, visibility, selectedClasses, startDate, startTime, endDate, endTime, classes })
     router.push('/teacher/exams')
   }
 
