@@ -7,7 +7,7 @@ import {
   initialClasses, initialCourses, initialExamAssignments, initialExams,
   initialUsers, initialAttempts, CURRENT_TEACHER_ID
 } from '@/lib/data'
-import { COURSE_COLORS, SUBJECT_NAMES } from '@/lib/constants'
+import { SUBJECT_NAMES } from '@/lib/constants'
 import { StudentRow } from './_components/StudentRow'
 import { ClassExamRow } from './_components/ClassExamRow'
 
