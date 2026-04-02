@@ -25,7 +25,7 @@ export function PlatformSwitcher() {
   // 36px tall, bg #0A2D6E (header-navy), fixed at top
   return (
     <div 
-      className="h-9 flex items-center justify-center px-4 shrink-0 relative"
+      className="h-9 flex items-center justify-center px-4 shrink-0 relative sticky top-0 "
       style={{ backgroundColor: '#0A2D6E', zIndex: 9999 }}
     >
       {/* Left: Logo */}
