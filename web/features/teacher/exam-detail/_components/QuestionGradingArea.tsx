@@ -5,8 +5,8 @@ import { QUESTION_TYPE_LABELS } from '@/lib/types'
 
 type AnswerItem = { questionId: string; answer: string | string[] }
 
-export function QuestionGradingArea({ questions, currentQuestion, currentQuestionIndex, currentAnswer, feedback, onScoreChange, onCommentChange }: {
-  questions: Question[]; currentQuestion: Question | undefined; currentQuestionIndex: number
+export function QuestionGradingArea({ currentQuestion, currentQuestionIndex, currentAnswer, feedback, onScoreChange, onCommentChange }: {
+  currentQuestion: Question | undefined; currentQuestionIndex: number
   currentAnswer: AnswerItem | null; feedback: Record<string, { score: number; comment: string }>
   onScoreChange: (questionId: string, score: number) => void; onCommentChange: (questionId: string, comment: string) => void
 }) {
