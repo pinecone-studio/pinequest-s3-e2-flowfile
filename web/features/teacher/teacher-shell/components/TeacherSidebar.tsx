@@ -31,10 +31,10 @@ export function TeacherSidebar({
   return (
     <aside
       className={cn(
-        'bg-white border-r flex flex-col transition-all duration-200',
+        'bg-white border-r flex flex-col transition-all duration-200 md:sticky md:top-9 md:self-start',
         isMobile ? 'w-[220px]' : collapsed ? 'w-14' : 'w-[220px]'
       )}
-      style={{ borderColor: '#DDE1E7', minHeight: 'calc(100vh - 36px)' }}
+      style={{ borderColor: '#DDE1E7', minHeight: 'calc(100vh - 36px)', height: 'calc(100vh - 36px)' }}
     >
       <div
         className={cn('p-4 border-b', collapsed && !isMobile && 'px-2')}
