@@ -52,7 +52,7 @@ export function DashboardSidePanel({
                   style={{ background: isToday ? '#0066FF' : '#F5F7FA', color: isToday ? 'white' : '#1A1A2E' }}>
                   {d.date.getDate()}
                 </div>
-                {d.exams.map(({ assignment, exam }, j) => (
+                {d.exams.map(({ exam }, j) => (
                   <div key={j} className="w-2 h-2 rounded-full"
                     style={{ background: COURSE_COLORS[exam?.subjectId ?? ''] ?? '#0066FF' }}
                     title={exam?.title ?? ''}
