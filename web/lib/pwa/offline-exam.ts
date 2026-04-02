@@ -1,11 +1,13 @@
-import { apiFetch, isApiConfigured } from '@/lib/api/client'
-import type { StudentExamQuestion } from '@/lib/api/student-exams'
+'use client'
 
-const ATTEMPT_CACHE_KEY = 'seedcone.offline.attempts'
-const DRAFT_QUEUE_KEY = 'seedcone.offline.drafts'
-const SUBMISSION_QUEUE_KEY = 'seedcone.offline.submissions'
+import {
+  saveOfflineDraft,
+  saveOfflineSubmission,
+  type StudentExamQuestion,
+} from '@/lib/api/student-exams'
+import { isApiConfigured } from '@/lib/api/client'
 
-type CachedAttempt = {
+type CachedAttemptPayload = {
   exam: {
     id: string
     title: string
@@ -21,19 +23,19 @@ type CachedAttempt = {
   startedAt: string
 }
 
-type DraftQueueItem = {
+type OfflineDraftPayload = {
   draftKey: string
   assignmentId: string
   examId: string
   studentId: string
-  answers: Record<string, string>
+  answers: Record<string, string | string[]>
   markedForReview: string[]
   currentIndex: number
   startedAt: string
   updatedAt: string
 }
 
-type SubmissionQueueItem = {
+type OfflineSubmissionPayload = {
   assignmentId: string
   examId: string
   studentId: string
@@ -42,108 +44,127 @@ type SubmissionQueueItem = {
   queuedAt: string
 }
 
-function readStore<T>(key: string): T[] {
-  if (typeof window === 'undefined') {
-    return []
-  }
+const ATTEMPT_PREFIX = 'seedcone.offline_attempt'
+const DRAFT_QUEUE_KEY = 'seedcone.offline_draft_queue'
+const SUBMISSION_QUEUE_KEY = 'seedcone.offline_submission_queue'
 
-  const raw = window.localStorage.getItem(key)
-  if (!raw) {
-    return []
+function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') {
+    return fallback
   }
 
   try {
-    return JSON.parse(raw) as T[]
+    const raw = window.localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : fallback
   } catch {
-    return []
+    return fallback
   }
 }
 
-function writeStore<T>(key: string, items: T[]) {
+function writeJson<T>(key: string, value: T) {
   if (typeof window === 'undefined') {
     return
   }
 
-  window.localStorage.setItem(key, JSON.stringify(items))
+  window.localStorage.setItem(key, JSON.stringify(value))
 }
 
-export function cacheExamAttempt(examId: string, studentId: string, attempt: CachedAttempt) {
-  const key = `${studentId}:${examId}`
-  const items = readStore<Array<{ key: string; value: CachedAttempt }>>(ATTEMPT_CACHE_KEY)
-  const next = items.filter((item) => item.key !== key)
-  next.push({ key, value: attempt })
-  writeStore(ATTEMPT_CACHE_KEY, next)
+export function getAttemptCacheKey(examId: string, studentId: string) {
+  return `${ATTEMPT_PREFIX}:${studentId}:${examId}`
+}
+
+export function cacheExamAttempt(
+  examId: string,
+  studentId: string,
+  payload: CachedAttemptPayload,
+) {
+  writeJson(getAttemptCacheKey(examId, studentId), payload)
 }
 
 export function readCachedExamAttempt(examId: string, studentId: string) {
-  const key = `${studentId}:${examId}`
-  const items = readStore<Array<{ key: string; value: CachedAttempt }>>(ATTEMPT_CACHE_KEY)
-  return items.find((item) => item.key === key)?.value ?? null
-}
-
-export function queueOfflineDraft(item: DraftQueueItem) {
-  const items = readStore<DraftQueueItem>(DRAFT_QUEUE_KEY)
-  const next = items.filter((draft) => draft.draftKey !== item.draftKey)
-  next.push(item)
-  writeStore(DRAFT_QUEUE_KEY, next)
-}
-
-export function queueOfflineSubmission(item: SubmissionQueueItem) {
-  const items = readStore<SubmissionQueueItem>(SUBMISSION_QUEUE_KEY)
-  const next = items.filter(
-    (submission) =>
-      !(submission.assignmentId === item.assignmentId && submission.studentId === item.studentId),
+  return readJson<CachedAttemptPayload | null>(
+    getAttemptCacheKey(examId, studentId),
+    null,
   )
-  next.push(item)
-  writeStore(SUBMISSION_QUEUE_KEY, next)
+}
+
+export function queueOfflineDraft(payload: OfflineDraftPayload) {
+  const queue = readJson<OfflineDraftPayload[]>(DRAFT_QUEUE_KEY, [])
+  const next = [
+    ...queue.filter((item) => item.draftKey !== payload.draftKey),
+    payload,
+  ]
+  writeJson(DRAFT_QUEUE_KEY, next)
+}
+
+export function queueOfflineSubmission(payload: OfflineSubmissionPayload) {
+  const submissionQueue = readJson<OfflineSubmissionPayload[]>(
+    SUBMISSION_QUEUE_KEY,
+    [],
+  )
+  const nextSubmissions = [
+    ...submissionQueue.filter(
+      (item) =>
+        !(
+          item.assignmentId === payload.assignmentId &&
+          item.studentId === payload.studentId
+        ),
+    ),
+    payload,
+  ]
+  writeJson(SUBMISSION_QUEUE_KEY, nextSubmissions)
+
+  const draftQueue = readJson<OfflineDraftPayload[]>(DRAFT_QUEUE_KEY, [])
+  writeJson(
+    DRAFT_QUEUE_KEY,
+    draftQueue.filter(
+      (item) =>
+        !(
+          item.assignmentId === payload.assignmentId &&
+          item.studentId === payload.studentId
+        ),
+    ),
+  )
 }
 
 export async function syncOfflineExamQueue() {
-  if (!isApiConfigured() || typeof window === 'undefined' || !navigator.onLine) {
+  if (typeof window === 'undefined' || !navigator.onLine || !isApiConfigured()) {
     return
   }
 
-  const drafts = readStore<DraftQueueItem>(DRAFT_QUEUE_KEY)
-  const submissions = readStore<SubmissionQueueItem>(SUBMISSION_QUEUE_KEY)
+  const draftQueue = readJson<OfflineDraftPayload[]>(DRAFT_QUEUE_KEY, [])
+  const remainingDrafts: OfflineDraftPayload[] = []
 
-  const remainingDrafts: DraftQueueItem[] = []
-  for (const draft of drafts) {
+  for (const draft of draftQueue) {
     try {
-      await apiFetch('/offline-exam-sync/draft', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(draft),
-      })
+      await saveOfflineDraft(draft)
     } catch {
       remainingDrafts.push(draft)
     }
   }
 
-  writeStore(DRAFT_QUEUE_KEY, remainingDrafts)
+  writeJson(DRAFT_QUEUE_KEY, remainingDrafts)
 
-  const remainingSubmissions: SubmissionQueueItem[] = []
-  for (const submission of submissions) {
+  const submissionQueue = readJson<OfflineSubmissionPayload[]>(
+    SUBMISSION_QUEUE_KEY,
+    [],
+  )
+  const remainingSubmissions: OfflineSubmissionPayload[] = []
+
+  for (const submission of submissionQueue) {
     try {
-      await apiFetch('/offline-exam-sync/submission', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(submission),
-      })
+      await saveOfflineSubmission(submission)
     } catch {
       remainingSubmissions.push(submission)
     }
   }
 
-  writeStore(SUBMISSION_QUEUE_KEY, remainingSubmissions)
+  writeJson(SUBMISSION_QUEUE_KEY, remainingSubmissions)
 }
 
 export function getOfflineQueueSnapshot() {
   return {
-    drafts: readStore<DraftQueueItem>(DRAFT_QUEUE_KEY),
-    submissions: readStore<SubmissionQueueItem>(SUBMISSION_QUEUE_KEY),
+    drafts: readJson<OfflineDraftPayload[]>(DRAFT_QUEUE_KEY, []),
+    submissions: readJson<OfflineSubmissionPayload[]>(SUBMISSION_QUEUE_KEY, []),
   }
 }
