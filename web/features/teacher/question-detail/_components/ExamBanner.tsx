@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import { Edit, Copy, Printer, Calendar, Lock, Globe } from 'lucide-react'
-import type { Exam, User } from '@/lib/types'
+import type { Exam } from '@/lib/types'
 
 type Subject = { id: string; name: string }
-export function ExamBanner({ exam, subject, owner, subjectColor, isOwner }: {
-  exam: Exam; subject: Subject | null; owner: User | null; subjectColor: string; isOwner: boolean
+export function ExamBanner({ exam, subject, subjectColor, isOwner }: {
+  exam: Exam; subject: Subject | null; subjectColor: string; isOwner: boolean
 }) {
   return (
     <div className="bg-white border rounded-[10px] overflow-hidden mb-6" style={{ borderColor: '#DDE1E7' }}>
