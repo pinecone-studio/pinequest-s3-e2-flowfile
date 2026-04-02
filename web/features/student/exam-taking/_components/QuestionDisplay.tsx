@@ -1,4 +1,4 @@
-import type { Question } from '@/lib/types'
+import type { StudentExamQuestion } from '@/lib/api/student-exams'
 import { QUESTION_TYPE_CONFIG } from '@/lib/constants'
 
 interface SubjectColor {
@@ -6,7 +6,7 @@ interface SubjectColor {
 }
 
 interface QuestionDisplayProps {
-  question: Question
+  question: StudentExamQuestion
   currentIndex: number
   subjectColor: SubjectColor
 }
@@ -14,7 +14,7 @@ interface QuestionDisplayProps {
 export function QuestionDisplay({ question, currentIndex, subjectColor }: QuestionDisplayProps) {
   return (
     <>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ backgroundColor: subjectColor.bg + '20', color: subjectColor.bg }}>
           Асуулт {currentIndex + 1}
         </span>
@@ -26,7 +26,7 @@ export function QuestionDisplay({ question, currentIndex, subjectColor }: Questi
         </span>
       </div>
 
-      <div className="bg-white rounded-xl border border-card-border p-6 mb-6">
+      <div className="mb-6 rounded-xl border border-card-border bg-white p-4 md:p-6">
         <p className="text-[17px] text-foreground leading-relaxed">
           {question.text}
         </p>
