@@ -1,5 +1,6 @@
 import { save } from '@/lib/data'
-import type { Attempt, Question, Result } from '@/lib/types'
+import type { Attempt, Result } from '@/lib/types'
+import type { StudentExamQuestion } from '@/lib/api/student-exams'
 
 export function scoreAndSave({
   exam,
@@ -11,8 +12,8 @@ export function scoreAndSave({
 }: {
   exam: { id: string; duration: number }
   assignment: { id: string } | null
-  questions: Question[]
-  answers: Record<string, string | string[]>
+  questions: StudentExamQuestion[]
+  answers: Record<string, string>
   timeRemaining: number
   currentStudentId: string
 }) {
@@ -52,7 +53,7 @@ export function scoreAndSave({
       }
     } else if (q.type === 'multiple') {
       const correct = q.correctAnswer as string[]
-      const userAnswer = (answer as string[]) || []
+      const userAnswer = answer ? (JSON.parse(answer) as string[]) : []
       if (JSON.stringify([...userAnswer].sort()) === JSON.stringify([...correct].sort())) {
         scorePerQuestion[q.id] = q.points
         totalScore += q.points
