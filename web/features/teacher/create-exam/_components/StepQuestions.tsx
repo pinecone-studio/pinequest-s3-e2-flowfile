@@ -10,7 +10,7 @@ import { QuestionTabFile } from './QuestionTabFile'
 type QuestionTab = 'new' | 'bank' | 'ai' | 'file'
 
 export function StepQuestions({
-  questions, questionTab, questionText, questionType, questionOptions, correctAnswer, questionPoints,
+  questionTab, questionText, questionType, questionOptions, correctAnswer, questionPoints,
   bankSearchQuery, selectedBankQuestions, filteredBankQuestions,
   aiTopic, aiDifficulty, aiCount, aiGenerating, aiGeneratedQuestions,
   importingFile, importFileName,
@@ -19,7 +19,7 @@ export function StepQuestions({
   onAiTopic, onAiDifficulty, onAiCount, onAiGenerate, onAddAiQuestions,
   onFileUpload, onFolderUpload, onDemo,
 }: {
-  questions: Question[]; questionTab: QuestionTab; questionText: string; questionType: QuestionType
+  questionTab: QuestionTab; questionText: string; questionType: QuestionType
   questionOptions: string[]; correctAnswer: string | string[]; questionPoints: number
   bankSearchQuery: string; selectedBankQuestions: string[]; filteredBankQuestions: Question[]
   aiTopic: string; aiDifficulty: 'easy' | 'medium' | 'hard'; aiCount: number; aiGenerating: boolean; aiGeneratedQuestions: Question[]
