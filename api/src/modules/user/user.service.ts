@@ -15,6 +15,15 @@ interface ClerkUserPayload {
   role?: UserRole;
 }
 
+interface DevUserPayload {
+  id: string;
+  clerkUserId: string;
+  email: string;
+  name: string;
+  imageUrl?: string | null;
+  role?: UserRole;
+}
+
 @Injectable()
 export class UserService {
   constructor(private readonly userRepository: UserRepository) {}
@@ -102,6 +111,36 @@ export class UserService {
 
     const newUser: NewUser = {
       id: crypto.randomUUID(),
+      clerkUserId: payload.clerkUserId,
+      email: payload.email,
+      name: payload.name,
+      imageUrl: payload.imageUrl ?? null,
+      role: payload.role ?? 'student',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    return this.userRepository.create(newUser);
+  }
+
+  async findOrCreateDevUser(payload: DevUserPayload) {
+    const existingUser = await this.userRepository.findById(payload.id);
+
+    if (existingUser) {
+      return this.userRepository.update(existingUser.id, {
+        clerkUserId: payload.clerkUserId,
+        email: payload.email,
+        name: payload.name,
+        imageUrl: payload.imageUrl ?? null,
+        role: payload.role ?? existingUser.role,
+      });
+    }
+
+    const now = new Date().toISOString();
+
+    const newUser: NewUser = {
+      id: payload.id,
       clerkUserId: payload.clerkUserId,
       email: payload.email,
       name: payload.name,
