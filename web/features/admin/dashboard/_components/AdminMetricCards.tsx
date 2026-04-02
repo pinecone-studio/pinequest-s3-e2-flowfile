@@ -1,4 +1,4 @@
-import { TrendingUp, Users, FileText, School } from 'lucide-react'
+import { TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type Stat = {
