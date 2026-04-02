@@ -6,7 +6,6 @@ import { getAll } from '@/lib/data'
 import type { Exam, User as UserType, Submission, Question } from '@/lib/types'
 import { initialExams, initialUsers, initialSubmissions, initialQuestions } from '@/lib/data'
 import { cn } from '@/lib/utils'
-import { QUESTION_TYPE_LABELS } from '@/lib/types'
 import { GradeStudentSidebar } from './_components/GradeStudentSidebar'
 import { QuestionGradingArea } from './_components/QuestionGradingArea'
 
@@ -93,7 +92,7 @@ export function ExamGradeClient({ params }: { params: Promise<{ id: string }> })
               })}
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              <QuestionGradingArea questions={questions} currentQuestion={currentQuestion} currentQuestionIndex={currentQuestionIndex} currentAnswer={currentAnswer} feedback={feedback} onScoreChange={handleScoreChange} onCommentChange={handleCommentChange} />
+              <QuestionGradingArea currentQuestion={currentQuestion} currentQuestionIndex={currentQuestionIndex} currentAnswer={currentAnswer} feedback={feedback} onScoreChange={handleScoreChange} onCommentChange={handleCommentChange} />
             </div>
             <div className="px-6 py-4 bg-white border-t border-card-border flex items-center justify-between">
               <button onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))} disabled={currentQuestionIndex === 0} className="px-4 py-2 border border-card-border rounded-lg text-[13px] font-medium text-foreground hover:bg-table-header transition-colors disabled:opacity-50 flex items-center gap-1.5"><ChevronLeft size={14} strokeWidth={1.5} />Өмнөх</button>
