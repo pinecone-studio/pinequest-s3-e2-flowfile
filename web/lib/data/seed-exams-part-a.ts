@@ -47,7 +47,7 @@ export const seedExamsPartA: Exam[] = [
   },
   { 
     id: 'E25ХИМ0001', 
-    title: 'Хими — Орган����к нэгдлүүд', 
+    title: 'Хими — Органик нэгдлүүд', 
     subjectId: 'ХИМ',
     grade: 10,
     chapter: '5-р бүлэг',
