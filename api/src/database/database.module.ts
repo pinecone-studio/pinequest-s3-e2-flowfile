@@ -8,6 +8,7 @@ import { SessionRepository } from 'src/modules/session/session.repository';
 import { AnswerRepository } from 'src/modules/answer/answer.repository';
 import { MonitoringRepository } from 'src/modules/monitoring/monitoring.repository';
 import { NotificationRepository } from 'src/modules/notification/notification.repository';
+import { QuizGeneratorRepository } from 'src/modules/quiz/quiz-generator.repository';
 
 @Module({
   providers: [
@@ -19,6 +20,7 @@ import { NotificationRepository } from 'src/modules/notification/notification.re
     AnswerRepository,
     MonitoringRepository,
     NotificationRepository,
+    QuizGeneratorRepository,
   ],
   exports: [
     UserRepository,
