@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useEffect, useRef, useState } from 'react'
+import { use, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { runPreviewCode } from '@/lib/api/student-exams'
 import { SUBJECT_COLORS } from '@/lib/constants'
@@ -39,6 +39,7 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
   const [codeResults, setCodeResults] = useState<Record<string, string | null>>({})
   const [codeErrors, setCodeErrors] = useState<Record<string, string | null>>({})
   const hasAutoSubmittedRef = useRef(false)
+  const lastOfflinePersistRef = useRef<{ signature: string; at: number } | null>(null)
 
   useEffect(() => {
     if (currentIndex >= session.questions.length) {
@@ -48,6 +49,26 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
 
   useEffect(() => {
     if (!session.exam) {
+      return
+    }
+
+    const signature = JSON.stringify({
+      examId: session.exam.id,
+      sessionId: session.sessionId,
+      currentIndex,
+      answers: session.answers,
+      markedForReview: Array.from(session.markedForReview),
+      questionCount: session.questions.length,
+      isApiBacked: session.isApiBacked,
+      startedAt: session.startedAt,
+    })
+
+    const now = Date.now()
+    const lastPersist = lastOfflinePersistRef.current
+    const shouldRefreshTimerSnapshot =
+      !lastPersist || now - lastPersist.at >= 15000 || session.timeRemaining <= 0
+
+    if (lastPersist?.signature === signature && !shouldRefreshTimerSnapshot) {
       return
     }
 
@@ -61,21 +82,24 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
       startedAt: session.startedAt ?? new Date().toISOString(),
     })
 
-    if (!session.isApiBacked) {
-      return
+    if (session.isApiBacked) {
+      queueOfflineDraft({
+        draftKey: `${session.currentStudentId}:${session.exam.id}`,
+        assignmentId: session.exam.id,
+        examId: session.exam.id,
+        studentId: session.currentStudentId,
+        answers: session.answers,
+        markedForReview: Array.from(session.markedForReview),
+        currentIndex,
+        startedAt: session.startedAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
     }
 
-    queueOfflineDraft({
-      draftKey: `${session.currentStudentId}:${session.exam.id}`,
-      assignmentId: session.exam.id,
-      examId: session.exam.id,
-      studentId: session.currentStudentId,
-      answers: session.answers,
-      markedForReview: Array.from(session.markedForReview),
-      currentIndex,
-      startedAt: session.startedAt ?? new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
+    lastOfflinePersistRef.current = {
+      signature,
+      at: now,
+    }
   }, [
     currentIndex,
     session.answers,
@@ -89,7 +113,7 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
     session.timeRemaining,
   ])
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!session.exam) {
       return
     }
@@ -119,7 +143,18 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
     } finally {
       setIsSubmitting(false)
     }
-  }
+  }, [
+    isSubmitting,
+    router,
+    session.answers,
+    session.assignment,
+    session.currentStudentId,
+    session.exam,
+    session.isApiBacked,
+    session.questions,
+    session.submitCurrentSession,
+    session.timeRemaining,
+  ])
 
   useEffect(() => {
     if (!session.isLoaded || !session.exam || session.timeRemaining <= 0) {
