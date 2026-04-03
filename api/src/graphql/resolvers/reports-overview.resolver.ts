@@ -13,19 +13,25 @@ export class ReportsOverviewResolver {
 
   @Query('reportsOverview')
   async getReportsOverview() {
-    const exams = await this.examService.getAllExams();
-
-    const [sessionsByExam, eventsByExam] = await Promise.all([
-      Promise.all(
-        exams.map((exam) => this.sessionService.getSessionsByExam(exam.id)),
-      ),
-      Promise.all(
-        exams.map((exam) => this.monitoringService.getEventsByExam(exam.id)),
-      ),
+    const [exams, allSessions, allEvents] = await Promise.all([
+      this.examService.getAllExams(),
+      this.sessionService.getAllSessions(),
+      this.monitoringService.getAllEvents(),
     ]);
 
-    const allSessions = sessionsByExam.flat();
-    const allEvents = eventsByExam.flat();
+    const sessionsByExamId = new Map<string, typeof allSessions>();
+    for (const s of allSessions) {
+      const arr = sessionsByExamId.get(s.examId) ?? [];
+      arr.push(s);
+      sessionsByExamId.set(s.examId, arr);
+    }
+
+    const eventsByExamId = new Map<string, typeof allEvents>();
+    for (const e of allEvents) {
+      const arr = eventsByExamId.get(e.examId) ?? [];
+      arr.push(e);
+      eventsByExamId.set(e.examId, arr);
+    }
 
     const subjectMap = new Map<
       string,
@@ -37,7 +43,7 @@ export class ReportsOverviewResolver {
       }
     >();
 
-    exams.forEach((exam, index) => {
+    exams.forEach((exam) => {
       const current = subjectMap.get(exam.subject) ?? {
         subject: exam.subject,
         examCount: 0,
@@ -46,8 +52,8 @@ export class ReportsOverviewResolver {
       };
 
       current.examCount += 1;
-      current.sessionCount += sessionsByExam[index].length;
-      current.suspiciousEventCount += eventsByExam[index].length;
+      current.sessionCount += (sessionsByExamId.get(exam.id) ?? []).length;
+      current.suspiciousEventCount += (eventsByExamId.get(exam.id) ?? []).length;
       subjectMap.set(exam.subject, current);
     });
 
