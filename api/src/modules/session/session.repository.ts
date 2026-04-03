@@ -36,10 +36,6 @@ export class SessionRepository {
     });
   }
 
-  async findAllSessions(): Promise<Session[]> {
-    return db.query.examSessions.findMany({ orderBy: desc(examSessions.createdAt) });
-  }
-
   async findSessionsByStudent(studentId: string): Promise<Session[]> {
     return db.query.examSessions.findMany({
       where: eq(examSessions.studentId, studentId),
@@ -167,6 +163,21 @@ export class SessionRepository {
       .set({ status, score, submittedAt: now, updatedAt: now })
       .where(eq(examSessions.id, id))
       .returning();
+    return session;
+  }
+
+  async gradeSession(id: string, score: number) {
+    const now = new Date().toISOString();
+    const [session] = await db
+      .update(examSessions)
+      .set({
+        status: 'graded',
+        score,
+        updatedAt: now,
+      })
+      .where(eq(examSessions.id, id))
+      .returning();
+
     return session;
   }
 

@@ -45,13 +45,13 @@ export function AnswerFormula({
   }, [value])
 
   useEffect(() => {
-    const keyboard = (window as Window & { mathVirtualKeyboard?: VirtualKeyboardLike }).mathVirtualKeyboard
+    const keyboard = (window as unknown as { mathVirtualKeyboard?: VirtualKeyboardLike }).mathVirtualKeyboard
 
     if (!keyboard) {
       return
     }
 
-    keyboard.layouts = ['numeric', 'symbols', 'functions', 'greek']
+    keyboard.layouts = ['numeric', 'symbols', 'alphabetic', 'greek']
     keyboard.alphabeticLayout = 'qwerty'
     keyboard.editToolbar = 'none'
 
@@ -68,7 +68,7 @@ export function AnswerFormula({
   }, [])
 
   const toggleKeyboard = () => {
-    const keyboard = (window as Window & { mathVirtualKeyboard?: VirtualKeyboardLike }).mathVirtualKeyboard
+    const keyboard = (window as unknown as { mathVirtualKeyboard?: VirtualKeyboardLike }).mathVirtualKeyboard
 
     if (!keyboard) {
       return
@@ -98,7 +98,7 @@ export function AnswerFormula({
           onChange(target.value ?? '')
         },
         onFocus: () => {
-          const keyboard = (window as Window & { mathVirtualKeyboard?: VirtualKeyboardLike }).mathVirtualKeyboard
+          const keyboard = (window as unknown as { mathVirtualKeyboard?: VirtualKeyboardLike }).mathVirtualKeyboard
           keyboard?.show({ animate: true })
         },
         className:

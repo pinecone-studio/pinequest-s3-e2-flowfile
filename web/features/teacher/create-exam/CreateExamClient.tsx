@@ -1,162 +1,505 @@
-import type { Course, Question, Exam, QuestionType } from '@/lib/types'
-import { SUBJECT_NAMES } from '@/lib/constants'
-import { CURRENT_TEACHER_ID, save } from '@/lib/data'
-import { buildExamAssignmentNotifications, saveNotifications } from '@/lib/notifications'
-import { getApiUrl } from '@/lib/api/client'
+'use client'
 
-export type ImportedQuestionPayload = {
-  question?: string; type?: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay'
-  options?: string[]; correctAnswer?: string | string[]; points?: number
-}
-export type ImportApiResponse = { questions?: ImportedQuestionPayload[]; parser?: string; error?: string }
-export type ImportFailure = { fileName: string; reason: string }
+import { useEffect, useState, type ChangeEvent } from 'react'
+import { useRouter } from 'next/navigation'
+import { Check, ChevronRight } from 'lucide-react'
+import { toast } from '@/hooks/use-toast'
+import { getAll, initialClasses, initialCourses, initialQuestions } from '@/lib/data'
+import { SUBJECT_COLORS, SUBJECT_NAMES } from '@/lib/constants'
+import type { Course, Question, QuestionType, SchoolClass } from '@/lib/types'
+import { ExamPreviewPanel } from './_components/ExamPreviewPanel'
+import { StepBasicInfo } from './_components/StepBasicInfo'
+import { QuestionEditorDialog } from './_components/QuestionEditorDialog'
+import { StepIndicator } from './_components/StepIndicator'
+import { StepQuestions } from './_components/StepQuestions'
+import { StepSchedule } from './_components/StepSchedule'
+import { StepSource } from './_components/StepSource'
+import {
+  generateDemoQuestions,
+  generateMockAIQuestions,
+  getCourseLabel,
+  isManualQuestionType,
+  mapImportedQuestions,
+  processImportFiles,
+  saveExamPayload,
+  stepLabels,
+} from './createExamUtils'
 
-export const stepLabels = ['Эх сурвалж', 'Ерөнхий мэдээлэл', 'Асуултууд', 'Хуваарь']
-const MANUAL_QUESTION_TYPES: QuestionType[] = ['short', 'long', 'formula', 'chemistry', 'code', 'voice', 'video', 'handwritten']
+type Step = 1 | 2 | 3 | 4
+type QuestionTab = 'new' | 'bank' | 'ai' | 'file'
 
-function getDevAuthHeaders() {
-  if (typeof window === 'undefined') {
-    return undefined
-  }
+export function CreateExamClient() {
+  const router = useRouter()
+  const [currentStep, setCurrentStep] = useState<Step>(1)
+  const [courses, setCourses] = useState<Course[]>(initialCourses)
+  const [classes, setClasses] = useState<SchoolClass[]>(initialClasses)
+  const [existingQuestions, setExistingQuestions] = useState<Question[]>(initialQuestions)
+  const [source, setSource] = useState<'new' | 'bank'>('new')
+  const [title, setTitle] = useState('')
+  const [courseId, setCourseId] = useState('')
+  const [chapter, setChapter] = useState('')
+  const [topic, setTopic] = useState('')
+  const [description, setDescription] = useState('')
+  const [duration, setDuration] = useState(45)
+  const [visibility, setVisibility] = useState<'private' | 'school'>('private')
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [questionTab, setQuestionTab] = useState<QuestionTab>('new')
+  const [questionText, setQuestionText] = useState('')
+  const [questionType, setQuestionType] = useState<QuestionType>('single')
+  const [questionOptions, setQuestionOptions] = useState<string[]>(['', '', '', ''])
+  const [correctAnswer, setCorrectAnswer] = useState<string | string[]>('')
+  const [matchingPairs, setMatchingPairs] = useState<{ left: string; right: string }[]>([
+    { left: '', right: '' },
+    { left: '', right: '' },
+  ])
+  const [questionPoints, setQuestionPoints] = useState(2)
+  const [bankSearchQuery, setBankSearchQuery] = useState('')
+  const [selectedBankQuestions, setSelectedBankQuestions] = useState<string[]>([])
+  const [aiTopic, setAiTopic] = useState('')
+  const [aiDifficulty, setAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
+  const [aiCount, setAiCount] = useState(5)
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiGeneratedQuestions, setAiGeneratedQuestions] = useState<Question[]>([])
+  const [importingFile, setImportingFile] = useState(false)
+  const [importFileName, setImportFileName] = useState('')
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([])
+  const [startDate, setStartDate] = useState('')
+  const [startTime, setStartTime] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [endTime, setEndTime] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null)
 
-  const token = window.localStorage.getItem('seedcone.dev_auth_token')
-  return token ? { Authorization: `Bearer ${token}` } : undefined
-}
+  useEffect(() => {
+    const localCourses = getAll<Course>('courses')
+    const localClasses = getAll<SchoolClass>('classes')
+    const localQuestions = getAll<Question>('questions')
 
-function getImportApiUrl() {
-  return getApiUrl('/parse-exam')
-}
+    if (localCourses.length > 0) {
+      setCourses(localCourses)
+    }
 
-async function postImportPayload(
-  payload: Record<string, unknown>,
-) {
-  const url = getImportApiUrl()
+    if (localClasses.length > 0) {
+      setClasses(localClasses)
+    }
 
-  if (!url) {
-    throw new Error('NEXT_PUBLIC_API_BASE_URL is not configured.')
-  }
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getDevAuthHeaders(),
-    },
-    body: JSON.stringify(payload),
-  })
-
-  const data = (await response.json()) as ImportApiResponse
-
-  if (!response.ok) {
-    throw new Error(data.error || 'Файл боловсруулах хүсэлт амжилтгүй боллоо.')
-  }
-
-  return data
-}
-
-export function isManualQuestionType(type: QuestionType) { return MANUAL_QUESTION_TYPES.includes(type) }
-export function getCourseLabel(course: Course) {
-  return `${SUBJECT_NAMES[course.subjectId] ?? course.subjectId} • ${course.grade}-р анги`
-}
-function arrayBufferToBase64(buffer: ArrayBuffer) {
-  let binary = ''; const bytes = new Uint8Array(buffer); const chunk = 0x8000
-  for (let i = 0; i < bytes.length; i += chunk) { binary += String.fromCharCode(...bytes.subarray(i, i + chunk)) }
-  return btoa(binary)
-}
-
-export function mapImportedQuestions(items: ImportedQuestionPayload[], existingCount: number): Question[] {
-  const baseId = Date.now()
-  return items.reduce<Question[]>((acc, item, index) => {
-    const text = item.question?.trim(); if (!text) return acc
-    const type: QuestionType = item.type === 'multiple_choice' ? 'single' : item.type === 'true_false' ? 'truefalse' : item.type === 'essay' ? 'long' : 'short'
-    const q: Question = { id: `import-q-${baseId}-${index}`, examId: '', text, type, points: Math.max(1, Number(item.points) || 10), order: existingCount + acc.length + 1, isManualGrade: isManualQuestionType(type) }
-    if (type === 'single') { q.options = Array.isArray(item.options) ? item.options.map(o => o.trim()).filter(Boolean) : []; q.correctAnswer = typeof item.correctAnswer === 'string' ? item.correctAnswer.trim() : '' }
-    else if (type === 'truefalse') { q.correctAnswer = (typeof item.correctAnswer === 'string' ? item.correctAnswer.trim().toLowerCase() : '') === 'false' ? 'false' : 'true' }
-    else if (typeof item.correctAnswer === 'string' && item.correctAnswer.trim()) { q.correctAnswer = item.correctAnswer.trim() }
-    acc.push(q); return acc
+    if (localQuestions.length > 0) {
+      setExistingQuestions(localQuestions)
+    }
   }, [])
-}
 
-export async function processImportFiles(files: File[], title: string, courseLabel: string) {
-  const collected: ImportedQuestionPayload[] = []; const skipped: string[] = []; const failures: ImportFailure[] = []; let usedLocalParser = false
-  for (const file of files) {
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
-    const isBinary = ['docx', 'pdf'].includes(ext)
+  const selectedCourse = courses.find((course) => course.id === courseId)
+  const availableClasses = selectedCourse
+    ? classes.filter((schoolClass) => selectedCourse.classIds.includes(schoolClass.id))
+    : []
+  const subjectColor =
+    SUBJECT_COLORS[(selectedCourse?.subjectId || 'math') as keyof typeof SUBJECT_COLORS] ||
+    SUBJECT_COLORS.math
+  const selectedCourseLabel = selectedCourse ? getCourseLabel(selectedCourse) : ''
+  const totalPoints = questions.reduce((sum, question) => sum + (question.points || 0), 0)
+  const editingQuestion =
+    editingQuestionIndex !== null ? questions[editingQuestionIndex] ?? null : null
+  const filteredBankQuestions = existingQuestions.filter(
+    (question) =>
+      !questions.some((existingQuestion) => existingQuestion.id === question.id) &&
+      (bankSearchQuery === '' ||
+        question.text.toLowerCase().includes(bankSearchQuery.toLowerCase())),
+  )
 
-    let payload: ImportApiResponse
+  const resetQuestionForm = () => {
+    setQuestionText('')
+    setQuestionType('single')
+    setQuestionOptions(['', '', '', ''])
+    setCorrectAnswer('')
+    setMatchingPairs([
+      { left: '', right: '' },
+      { left: '', right: '' },
+    ])
+    setQuestionPoints(2)
+  }
+
+  const handleAddQuestion = () => {
+    if (!questionText.trim()) {
+      return
+    }
+
+    const newQuestion: Question = {
+      id: `q-new-${Date.now()}`,
+      examId: '',
+      text: questionText,
+      type: questionType,
+      points: questionPoints,
+      order: questions.length + 1,
+      isManualGrade: isManualQuestionType(questionType),
+    }
+
+    if (questionType === 'single' || questionType === 'multiple') {
+      newQuestion.options = questionOptions.filter((option) => option.trim())
+      newQuestion.correctAnswer = correctAnswer
+    } else if (questionType === 'truefalse') {
+      newQuestion.correctAnswer = correctAnswer
+    } else if (questionType === 'matching') {
+      newQuestion.matchingPairs = matchingPairs.filter(
+        (pair) => pair.left.trim() && pair.right.trim(),
+      )
+    }
+
+    setQuestions((previousQuestions) => [...previousQuestions, newQuestion])
+    resetQuestionForm()
+  }
+
+  const handleAddFromBank = () => {
+    setQuestions((previousQuestions) => [
+      ...previousQuestions,
+      ...existingQuestions.filter((question) => selectedBankQuestions.includes(question.id)),
+    ])
+    setSelectedBankQuestions([])
+  }
+
+  const handleAiGenerate = async () => {
+    setAiGenerating(true)
+
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    setAiGeneratedQuestions(generateMockAIQuestions(aiTopic, aiDifficulty, aiCount))
+    setAiGenerating(false)
+  }
+
+  const handleAddAiQuestions = (ids: string[]) => {
+    setQuestions((previousQuestions) => [
+      ...previousQuestions,
+      ...aiGeneratedQuestions.filter((question) => ids.includes(question.id)),
+    ])
+    setAiGeneratedQuestions((previousQuestions) =>
+      previousQuestions.filter((question) => !ids.includes(question.id)),
+    )
+  }
+
+  const importFiles = async (fileList: FileList | null) => {
+    const files = fileList ? Array.from(fileList) : []
+
+    if (files.length === 0) {
+      return
+    }
+
+    setImportingFile(true)
+    setImportFileName(files.length === 1 ? files[0].name : `${files.length} файл`)
 
     try {
-      const fileText = isBinary ? '' : await file.text()
-      const fileBuffer = isBinary ? arrayBufferToBase64(await file.arrayBuffer()) : undefined
-      payload = await postImportPayload({
-        fileText,
-        fileBuffer,
-        fileType: file.type,
-        fileName: file.name,
+      const { collected, failures } = await processImportFiles(
+        files,
         title,
-        courseLabel,
-      })
+        selectedCourseLabel,
+      )
+      const importedQuestions = mapImportedQuestions(collected, questions.length)
+
+      if (importedQuestions.length === 0) {
+        throw new Error('Сонгосон файл эсвэл хавтсаас асуулт олдсонгүй.')
+      }
+
+      setQuestions((previousQuestions) => [...previousQuestions, ...importedQuestions])
+      setQuestionTab('new')
+
+      if (failures.length > 0) {
+        const [firstFailure] = failures
+
+        toast({
+          variant: 'destructive',
+          title: `${failures.length} файл алгасагдлаа`,
+          description: `${firstFailure.fileName}: ${firstFailure.reason}`,
+        })
+      }
     } catch (error) {
-      skipped.push(file.name)
-      failures.push({
-        fileName: file.name,
-        reason: error instanceof Error ? error.message : 'Файл боловсруулах үед тодорхойгүй алдаа гарлаа.',
+      toast({
+        variant: 'destructive',
+        title: 'Импорт амжилтгүй боллоо',
+        description: error instanceof Error ? error.message : 'Дахин оролдоно уу.',
       })
-      continue
-    }
-
-    if (payload.parser === 'local') usedLocalParser = true
-    if (payload.questions?.length) collected.push(...payload.questions)
-    else {
-      skipped.push(file.name)
-      failures.push({
-        fileName: file.name,
-        reason: payload.error || 'Асуулт таньж чадсангүй.',
-      })
+    } finally {
+      setImportingFile(false)
+      setImportFileName('')
     }
   }
-  return { collected, skipped, failures, usedLocalParser }
-}
 
-export function generateMockAIQuestions(aiTopic: string, aiDifficulty: 'easy' | 'medium' | 'hard', aiCount: number): Question[] {
-  const label = aiDifficulty === 'easy' ? 'Хөнгөн' : aiDifficulty === 'medium' ? 'Дунд' : 'Хүнд'
-  return Array.from({ length: aiCount }, (_, i) => ({
-    id: `ai-q-${Date.now()}-${i}`, examId: '',
-    text: `${aiTopic}-тэй холбоотой асуулт #${i + 1} (${label})`,
-    type: (i % 3 === 0 ? 'single' : i % 3 === 1 ? 'multiple' : 'truefalse') as QuestionType,
-    points: aiDifficulty === 'easy' ? 1 : aiDifficulty === 'medium' ? 2 : 3,
-    order: i + 1, isManualGrade: false,
-    options: i % 3 !== 2 ? ['Хариулт А', 'Хариулт Б', 'Хариулт В', 'Хариулт Г'] : undefined,
-    correctAnswer: i % 3 === 0 ? 'Хариулт А' : i % 3 === 1 ? ['Хариулт А', 'Хариулт Б'] : 'true',
-  }))
-}
-
-export function generateDemoQuestions(subjectName: string, existingCount: number): Question[] {
-  const b = Date.now()
-  return [
-    { id: `demo-q-${b}-1`, examId: '', text: `${subjectName} хичээлээс зөв тодорхойлолтыг сонгоно уу.`, type: 'single', options: ['Хариулт А', 'Хариулт Б', 'Хариулт В', 'Хариулт Г'], correctAnswer: 'Хариулт А', points: 2, order: existingCount + 1, isManualGrade: false },
-    { id: `demo-q-${b}-2`, examId: '', text: `${subjectName} хичээлийн дараах өгүүлбэр үнэн эсэхийг сонгоно уу.`, type: 'truefalse', correctAnswer: 'true', points: 1, order: existingCount + 2, isManualGrade: false },
-    { id: `demo-q-${b}-3`, examId: '', text: `${subjectName} хичээлийн гол ойлголтыг тайлбарлана уу.`, type: 'short', points: 3, order: existingCount + 3, isManualGrade: true },
-  ]
-}
-
-export function saveExamPayload(params: {
-  questions: Question[]; title: string; selectedCourse: Course; chapter: string; topic: string
-  description: string; duration: number; totalPoints: number; visibility: 'private' | 'school'
-  selectedClasses: string[]; startDate: string; startTime: string; endDate: string; endTime: string
-  classes: { id: string; name: string; studentIds: string[] }[]
-}) {
-  const { questions, title, selectedCourse, chapter, topic, description, duration, totalPoints, visibility, selectedClasses, startDate, startTime, endDate, endTime, classes } = params
-  const now = new Date().toISOString(); const newExamId = `exam-${Date.now()}`
-  const prepared = questions.map((q, i) => ({ ...q, examId: newExamId, order: i + 1, isManualGrade: isManualQuestionType(q.type) }))
-  const exam: Exam = { id: newExamId, title, subjectId: selectedCourse.subjectId, grade: selectedCourse.grade, chapter: chapter || undefined, topic: topic || undefined, description: description || undefined, duration, totalPoints, ownerType: 'teacher', visibility, ownerId: CURRENT_TEACHER_ID, collaboratorIds: [], createdAt: now, updatedAt: now, questionIds: prepared.map(q => q.id), status: selectedClasses.length > 0 ? 'published' : 'draft', isTemplate: false, tags: [selectedCourse.subjectId, chapter, topic].filter(Boolean) as string[] }
-  prepared.forEach(q => { if (/^(q-new|ai-q|demo-q|import-q)-/.test(q.id)) save('questions', q) })
-  save('exams', exam)
-  if (selectedClasses.length > 0 && startDate && startTime && endDate && endTime) {
-    selectedClasses.forEach(classId => save('examAssignments', { id: `assignment-${Date.now()}-${classId}`, examId: exam.id, classId, assignedBy: CURRENT_TEACHER_ID, scheduledStart: `${startDate}T${startTime}`, scheduledEnd: `${endDate}T${endTime}`, isPaused: false, extendedMinutes: 0, status: 'scheduled' }))
-    saveNotifications(buildExamAssignmentNotifications({
-      exam,
-      selectedClasses: classes.filter((schoolClass) => selectedClasses.includes(schoolClass.id)),
-    }))
+  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    await importFiles(event.target.files)
+    event.target.value = ''
   }
+
+  const handleFolderUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    await importFiles(event.target.files)
+    event.target.value = ''
+  }
+
+  const handleFillGeneralInfoDemo = () => {
+    const demoCourse = selectedCourse ?? courses[0]
+
+    if (!demoCourse) {
+      return
+    }
+
+    const subjectName = SUBJECT_NAMES[demoCourse.subjectId] ?? demoCourse.subjectId
+    setCourseId(demoCourse.id)
+    setTitle(`${subjectName} - 1-р улирлын шалгалт`)
+    setChapter(`${demoCourse.grade}-р ангийн давтлага`)
+    setTopic(
+      subjectName === 'Математик' ? 'Квадрат тэгшитгэл' : `${subjectName} хичээлийн үндсэн сэдэв`,
+    )
+    setDescription(`${subjectName} хичээлийн ойлголт, бодлого бодолт, хэрэглээг шалгах demo шалгалт.`)
+    setDuration(45)
+    setVisibility('private')
+  }
+
+  const handleAddDemoQuestions = () => {
+    const subjectName = selectedCourse
+      ? SUBJECT_NAMES[selectedCourse.subjectId] ?? selectedCourse.subjectId
+      : 'Ерөнхий'
+
+    setQuestions((previousQuestions) => [
+      ...previousQuestions,
+      ...generateDemoQuestions(subjectName, previousQuestions.length),
+    ])
+  }
+
+  const handleSaveExam = async () => {
+    if (!selectedCourse || saving) {
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      await saveExamPayload({
+        questions,
+        title,
+        selectedCourse,
+        chapter,
+        topic,
+        description,
+        duration,
+        totalPoints,
+        visibility,
+        selectedClasses,
+        startDate,
+        startTime,
+        endDate,
+        endTime,
+        classes,
+      })
+
+      router.push('/teacher/exams')
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Шалгалт хадгалах үед алдаа гарлаа',
+        description: error instanceof Error ? error.message : 'Дахин оролдоно уу.',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRemoveQuestion = (index: number) => {
+    setQuestions((previousQuestions) =>
+      previousQuestions
+        .filter((_, questionIndex) => questionIndex !== index)
+        .map((question, questionIndex) => ({
+          ...question,
+          order: questionIndex + 1,
+        })),
+    )
+
+    setEditingQuestionIndex((previousIndex) => {
+      if (previousIndex === null) {
+        return previousIndex
+      }
+
+      if (previousIndex === index) {
+        return null
+      }
+
+      if (previousIndex > index) {
+        return previousIndex - 1
+      }
+
+      return previousIndex
+    })
+  }
+
+  const handleUpdateQuestion = (updatedQuestion: Question) => {
+    if (editingQuestionIndex === null) {
+      return
+    }
+
+    setQuestions((previousQuestions) =>
+      previousQuestions.map((question, questionIndex) =>
+        questionIndex === editingQuestionIndex
+          ? {
+              ...updatedQuestion,
+              order: questionIndex + 1,
+            }
+          : question,
+      ),
+    )
+    setEditingQuestionIndex(null)
+  }
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 1:
+        return true
+      case 2:
+        return Boolean(title.trim() && courseId)
+      case 3:
+        return questions.length > 0
+      case 4:
+        return true
+    }
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-36px)]">
+      <ExamPreviewPanel
+        title={title}
+        selectedCourseLabel={selectedCourseLabel}
+        subjectColor={subjectColor}
+        duration={duration}
+        questions={questions}
+        totalPoints={totalPoints}
+        onRemoveQuestion={handleRemoveQuestion}
+        onSelectQuestion={setEditingQuestionIndex}
+        onSave={handleSaveExam}
+      />
+      <div className="flex-1 bg-page-bg flex flex-col">
+        <StepIndicator
+          currentStep={currentStep}
+          stepLabels={stepLabels}
+          onStepClick={(step) => setCurrentStep(step as Step)}
+        />
+        <div className="flex-1 overflow-y-auto p-8">
+          {currentStep === 1 && <StepSource source={source} onChange={setSource} />}
+          {currentStep === 2 && (
+            <StepBasicInfo
+              title={title}
+              courseId={courseId}
+              chapter={chapter}
+              topic={topic}
+              description={description}
+              duration={duration}
+              visibility={visibility}
+              courses={courses}
+              onTitle={setTitle}
+              onCourseId={setCourseId}
+              onChapter={setChapter}
+              onTopic={setTopic}
+              onDescription={setDescription}
+              onDuration={setDuration}
+              onVisibility={setVisibility}
+              onDemo={handleFillGeneralInfoDemo}
+            />
+          )}
+          {currentStep === 3 && (
+            <StepQuestions
+              questionTab={questionTab}
+              questionText={questionText}
+              questionType={questionType}
+              questionOptions={questionOptions}
+              correctAnswer={correctAnswer}
+              questionPoints={questionPoints}
+              matchingPairs={matchingPairs}
+              bankSearchQuery={bankSearchQuery}
+              selectedBankQuestions={selectedBankQuestions}
+              filteredBankQuestions={filteredBankQuestions}
+              aiTopic={aiTopic}
+              aiDifficulty={aiDifficulty}
+              aiCount={aiCount}
+              aiGenerating={aiGenerating}
+              aiGeneratedQuestions={aiGeneratedQuestions}
+              importingFile={importingFile}
+              importFileName={importFileName}
+              onQuestionTab={setQuestionTab}
+              onQuestionText={setQuestionText}
+              onQuestionType={setQuestionType}
+              onQuestionOptions={setQuestionOptions}
+              onCorrectAnswer={setCorrectAnswer}
+              onQuestionPoints={setQuestionPoints}
+              onMatchingPairs={setMatchingPairs}
+              onBankSearchQuery={setBankSearchQuery}
+              onSelectedBankQuestions={setSelectedBankQuestions}
+              onAddQuestion={handleAddQuestion}
+              onAddFromBank={handleAddFromBank}
+              onAiTopic={setAiTopic}
+              onAiDifficulty={setAiDifficulty}
+              onAiCount={setAiCount}
+              onAiGenerate={handleAiGenerate}
+              onAddAiQuestions={handleAddAiQuestions}
+              onFileUpload={handleFileUpload}
+              onFolderUpload={handleFolderUpload}
+              onDemo={handleAddDemoQuestions}
+            />
+          )}
+          {currentStep === 4 && (
+            <StepSchedule
+              courseId={courseId}
+              selectedClasses={selectedClasses}
+              startDate={startDate}
+              startTime={startTime}
+              endDate={endDate}
+              endTime={endTime}
+              availableClasses={availableClasses}
+              onSelectedClasses={setSelectedClasses}
+              onStartDate={setStartDate}
+              onStartTime={setStartTime}
+              onEndDate={setEndDate}
+              onEndTime={setEndTime}
+            />
+          )}
+        </div>
+        <div className="px-8 py-4 bg-white border-t border-card-border flex items-center justify-between">
+          <button
+            onClick={() => setCurrentStep((previousStep) => Math.max(1, previousStep - 1) as Step)}
+            disabled={currentStep === 1}
+            className="px-4 py-2 border border-card-border rounded-lg text-[13px] font-medium text-foreground hover:bg-table-header transition-colors disabled:opacity-50"
+          >
+            Өмнөх
+          </button>
+          <span className="text-[13px] text-text-secondary">
+            {questions.length} асуулт • {totalPoints} оноо
+          </span>
+          {currentStep < 4 ? (
+            <button
+              onClick={() =>
+                setCurrentStep((previousStep) => Math.min(4, previousStep + 1) as Step)
+              }
+              disabled={!canProceed()}
+              className="px-4 py-2 bg-primary text-white rounded-lg text-[13px] font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            >
+              Дараах
+              <ChevronRight size={14} strokeWidth={1.5} />
+            </button>
+          ) : (
+            <button
+              onClick={handleSaveExam}
+              disabled={!title || questions.length === 0 || saving}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg text-[13px] font-medium hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <Check size={14} strokeWidth={1.5} />
+              {saving ? 'Хадгалж байна...' : 'Шалгалт үүсгэх'}
+            </button>
+          )}
+        </div>
+      </div>
+      <QuestionEditorDialog
+        open={editingQuestion !== null}
+        question={editingQuestion}
+        questionNumber={editingQuestionIndex !== null ? editingQuestionIndex + 1 : undefined}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingQuestionIndex(null)
+          }
+        }}
+        onSave={handleUpdateQuestion}
+      />
+    </div>
+  )
 }

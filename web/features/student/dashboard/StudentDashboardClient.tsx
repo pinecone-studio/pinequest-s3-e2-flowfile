@@ -6,6 +6,7 @@ import { fetchAssignedExams, type StudentExamSummary } from '@/lib/api/student-e
 import { isApiConfigured } from '@/lib/api/client'
 import { getAll, CURRENT_STUDENT_ID } from '@/lib/data'
 import type { Exam, ExamAssignment, Attempt, User as UserType, SchoolClass } from '@/lib/types'
+import { formatMongolianShortDateTime } from '@/lib/date-time'
 import {
   initialExams,
   initialExamAssignments,
@@ -16,15 +17,6 @@ import {
 import { StudentStatCards } from './_components/StudentStatCards'
 import { ExamTabFilter } from './_components/ExamTabFilter'
 import { ExamAssignmentCard } from './_components/ExamAssignmentCard'
-
-function formatDateTime(dateStr: string) {
-  const date = new Date(dateStr)
-  return (
-    date.toLocaleDateString('mn-MN', { month: 'short', day: 'numeric' }) +
-    ', ' +
-    date.toLocaleTimeString('mn-MN', { hour: '2-digit', minute: '2-digit' })
-  )
-}
 
 export function StudentDashboardClient() {
   const [exams, setExams] = useState<Exam[]>(initialExams)
@@ -117,7 +109,7 @@ export function StudentDashboardClient() {
               durationMinutes={item.exam.durationMinutes}
               questionCount={0}
               teacherName="Багш"
-              scheduledStart={formatDateTime(item.exam.startsAt ?? item.enrolledAt)}
+              scheduledStart={formatMongolianShortDateTime(item.exam.startsAt ?? item.enrolledAt)}
             />
           ))}
         </div>
@@ -211,7 +203,7 @@ export function StudentDashboardClient() {
               durationMinutes={exam.duration}
               questionCount={(exam.questionIds ?? []).length}
               teacherName={getTeacherName(exam.ownerId)}
-              scheduledStart={formatDateTime(assignment.scheduledStart)}
+              scheduledStart={formatMongolianShortDateTime(assignment.scheduledStart)}
             />
           )
         })}

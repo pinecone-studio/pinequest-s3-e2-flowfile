@@ -537,11 +537,14 @@ function segmentQuestionBlocksLocally(text: string, subjectProfile: SubjectProfi
     }
 
     if (isSharedContextLine(line) && !numberedPromptPattern.test(line) && !isEssayPrompt(line)) {
+      const activePendingContext = pendingContext as PendingSharedContext | null
+      const pendingText: string | undefined = activePendingContext?.text
+      const pendingImageMarker: string | undefined = activePendingContext?.imageMarker
       pendingContext = {
-        text: pendingContext?.text ? `${pendingContext.text} ${line}` : line,
+        text: pendingText ? `${pendingText} ${line}` : line,
         sectionType: inferSectionType(line, subjectProfile),
         imageMarker:
-          [...line.matchAll(/\[TABLE_IMAGE_\d+\]/g)].map(match => match[0])[0] || pendingContext?.imageMarker,
+          [...line.matchAll(/\[TABLE_IMAGE_\d+\]/g)].map(match => match[0])[0] || pendingImageMarker,
       }
       continue
     }
@@ -723,20 +726,23 @@ function parseSingleQuestionBlockLocally(
 }
 
 function extractQuestionsLocally(text: string, subjectProfile: SubjectProfile): ImportedQuestionPayload[] {
-  return segmentQuestionBlocksLocally(text, subjectProfile)
-    .map(block => {
+  return segmentQuestionBlocksLocally(text, subjectProfile).reduce<ImportedQuestionPayload[]>(
+    (result, block) => {
       const parsed = parseSingleQuestionBlockLocally(block.rawBlock, subjectProfile, block.sectionType)
-      if (!parsed) return null
+      if (!parsed) return result
 
       const sharedPrefix = normalizeWhitespace(block.sharedContext ?? '')
       const question = sharedPrefix ? normalizeWhitespace(`${sharedPrefix} ${parsed.question ?? ''}`) : parsed.question
-      return {
+      result.push({
         ...parsed,
         question,
         imageUrl: block.imageMarker || '',
-      }
-    })
-    .filter((item): item is ImportedQuestionPayload => Boolean(item))
+      })
+
+      return result
+    },
+    [],
+  )
 }
 
 function looksLikeBadQuestion(q: ImportedQuestionPayload) {

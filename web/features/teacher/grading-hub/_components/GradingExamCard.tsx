@@ -1,19 +1,18 @@
 import Link from 'next/link'
 import { Users, Clock, FileText } from 'lucide-react'
-import type { Exam, SchoolClass } from '@/lib/types'
 
 export function GradingExamCard({
   examId,
   classId,
-  exam,
-  cls,
+  title,
+  className,
   manualCount,
   stats,
 }: {
   examId: string
   classId: string
-  exam: Exam
-  cls: SchoolClass
+  title: string
+  className: string
   manualCount: number
   stats: { submitted: number; graded: number; total: number }
 }) {
@@ -23,9 +22,9 @@ export function GradingExamCard({
         <FileText size={22} style={{ color: '#B45309' }} strokeWidth={1.5} />
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="text-[15px] font-medium mb-1" style={{ color: '#1A1A2E' }}>{exam.title}</h3>
+        <h3 className="text-[15px] font-medium mb-1" style={{ color: '#1A1A2E' }}>{title}</h3>
         <div className="flex items-center gap-3 text-[12px]" style={{ color: '#5A6474' }}>
-          <span className="px-2 py-0.5 rounded" style={{ backgroundColor: '#F5F7FA' }}>{cls.name}</span>
+          <span className="px-2 py-0.5 rounded" style={{ backgroundColor: '#F5F7FA' }}>{className}</span>
           <span className="flex items-center gap-1"><Users size={12} strokeWidth={1.5} />{stats.submitted} гараар шалгах даалгавар</span>
           <span className="flex items-center gap-1"><Clock size={12} strokeWidth={1.5} />{manualCount} асуулт</span>
         </div>

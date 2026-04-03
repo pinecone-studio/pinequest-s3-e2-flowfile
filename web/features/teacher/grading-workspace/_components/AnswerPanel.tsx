@@ -70,7 +70,16 @@ export function AnswerPanel({
         </h3>
         {currentAnswer ? (
           <div className="p-4 bg-table-header rounded-lg">
-            {currentQuestion.type === 'long' || currentQuestion.type === 'short' ? (
+            {currentQuestion.type === 'voice' || currentQuestion.type === 'video' || currentQuestion.type === 'handwritten' ? (
+              <a
+                href={String(currentAnswer.answer)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[14px] text-primary underline underline-offset-2"
+              >
+                Файл нээх
+              </a>
+            ) : currentQuestion.type === 'long' || currentQuestion.type === 'short' || currentQuestion.type === 'formula' || currentQuestion.type === 'chemistry' || currentQuestion.type === 'code' ? (
               <p className="text-[14px] text-foreground whitespace-pre-wrap">{currentAnswer.answer as string}</p>
             ) : currentQuestion.type === 'truefalse' ? (
               <p className="text-[14px] text-foreground">{currentAnswer.answer === 'true' ? 'Үнэн' : 'Худал'}</p>

@@ -6,6 +6,11 @@ import {
   getAuthHeaders,
   isApiConfigured,
 } from '@/lib/api/client'
+import {
+  getQuestionTypeFromApi,
+  parseMatchingPairs,
+  parseQuestionOptions,
+} from '@/lib/exam-question-meta'
 
 export type StudentExamStatus =
   | 'upcoming'
@@ -164,67 +169,6 @@ interface ApiAttemptResponse {
   }
 }
 
-function parseMaybeJson<T>(value?: string | null, fallback?: T): T | undefined {
-  if (!value) {
-    return fallback
-  }
-
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return fallback
-  }
-}
-
-function parseOptions(optionsJson: string | null) {
-  if (!optionsJson) {
-    return undefined
-  }
-
-  try {
-    const parsed = JSON.parse(optionsJson) as unknown
-    return Array.isArray(parsed)
-      ? parsed.filter((item): item is string => typeof item === 'string')
-      : undefined
-  } catch {
-    return undefined
-  }
-}
-
-function inferQuestionType(
-  inputType: ApiAttemptResponse['questions'][number]['inputType'],
-  subjectHint?: string | null,
-): StudentExamQuestionType {
-  const hint = subjectHint?.toLowerCase() ?? ''
-
-  if (hint.includes('video')) {
-    return 'video'
-  }
-
-  if (hint.includes('code')) {
-    return 'code'
-  }
-
-  switch (inputType) {
-    case 'mcq':
-      return 'single'
-    case 'short_text':
-      return 'short'
-    case 'rich_text':
-      return 'long'
-    case 'math_formula':
-      return 'formula'
-    case 'chem_formula':
-      return 'chemistry'
-    case 'voice_record':
-      return 'voice'
-    case 'handwritten':
-      return 'handwritten'
-    default:
-      return 'long'
-  }
-}
-
 function parseStructuredAnswer(value: string | null) {
   if (!value) {
     return ''
@@ -257,20 +201,29 @@ export function mapAttemptToQuestionList(
   return attempt.questions
     .slice()
     .sort((left, right) => left.orderIndex - right.orderIndex)
-    .map((question) => ({
-      id: question.id,
-      text: question.content,
-      type: inferQuestionType(question.inputType, question.subjectHint),
-      points: question.points,
-      order: question.orderIndex,
-      options: parseOptions(question.optionsJson),
-      matchingPairs: parseMaybeJson<Array<{ left: string; right: string }>>(
-        question.optionsJson,
-      ),
-      correctAnswer: null,
-      subjectHint: question.subjectHint,
-      isRequired: question.isRequired,
-    }))
+    .map((question) => {
+      const type = getQuestionTypeFromApi(
+        question.inputType,
+        question.subjectHint,
+      ) as StudentExamQuestionType
+
+      return {
+        id: question.id,
+        text: question.content,
+        type,
+        points: question.points,
+        order: question.orderIndex,
+        options:
+          type === 'matching' ? undefined : parseQuestionOptions(question.optionsJson),
+        matchingPairs:
+          type === 'matching'
+            ? parseMatchingPairs(question.optionsJson)
+            : undefined,
+        correctAnswer: null,
+        subjectHint: question.subjectHint,
+        isRequired: question.isRequired,
+      }
+    })
 }
 
 export function mapAttemptToAnswerMap(attempt: ApiAttemptResponse) {
@@ -472,11 +425,15 @@ export async function uploadAnswerAsset(file: File, kind?: string) {
     formData.append('kind', kind)
   }
 
+  const headers = new Headers()
+  const authHeaders = getAuthHeaders('student')
+  if (authHeaders.Authorization) {
+    headers.set('Authorization', authHeaders.Authorization)
+  }
+
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      ...getAuthHeaders('student'),
-    },
+    headers,
     body: formData,
     cache: 'no-store',
   })

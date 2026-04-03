@@ -84,7 +84,10 @@ export class SessionService {
       this.answerRepo.findAnswersByExam(examId),
     ]);
     const submitted = sessions.filter(
-      (s) => s.status === 'submitted' || s.status === 'force_submitted',
+      (s) =>
+        s.status === 'submitted' ||
+        s.status === 'force_submitted' ||
+        s.status === 'graded',
     );
     const submittedIds = new Set(submitted.map((s) => s.id));
     return questions.map((q) => {
@@ -92,7 +95,7 @@ export class SessionService {
         (a) => a.questionId === q.id && submittedIds.has(a.sessionId),
       );
       const correctCount = qAnswers.filter(
-        (a) => a.textAnswer === q.correctAnswer,
+        (a) => this.isCorrectMcqAnswer(a.textAnswer, q.correctAnswer),
       ).length;
       return {
         questionId: q.id,
@@ -128,7 +131,8 @@ export class SessionService {
 
     if (
       existingSession?.status === 'submitted' ||
-      existingSession?.status === 'force_submitted'
+      existingSession?.status === 'force_submitted' ||
+      existingSession?.status === 'graded'
     ) {
       throw new BadRequestException('Session already submitted');
     }
@@ -219,7 +223,8 @@ export class SessionService {
 
     if (
       session.status === 'submitted' ||
-      session.status === 'force_submitted'
+      session.status === 'force_submitted' ||
+      session.status === 'graded'
     ) {
       return session;
     }
@@ -266,6 +271,38 @@ export class SessionService {
     return this.sessionRepo.flagSession(id);
   }
 
+  async gradeSession(id: string, score: number, user: AuthenticatedUser) {
+    const session = await this.getSessionOrThrow(id);
+    const exam = await this.ensureTeacherOwnsExam(session.examId, user.id);
+    const questions = await this.questionRepo.findQuestionsByExam(session.examId);
+    const maxScore = questions.reduce((sum, question) => sum + question.points, 0);
+
+    if (
+      session.status !== 'submitted' &&
+      session.status !== 'force_submitted' &&
+      session.status !== 'graded'
+    ) {
+      throw new BadRequestException('Only submitted sessions can be graded');
+    }
+
+    if (score < 0 || score > maxScore) {
+      throw new BadRequestException(`Score must be between 0 and ${maxScore}`);
+    }
+
+    const gradedSession = await this.sessionRepo.gradeSession(id, score);
+
+    await this.notificationService.createNotification({
+      recipientId: session.studentId,
+      examId: exam.id,
+      sessionId: session.id,
+      title: 'Exam graded',
+      body: `Your result for "${exam.title}" is now available.`,
+      type: 'exam_published',
+    });
+
+    return gradedSession;
+  }
+
   async forceSubmitSession(
     id: string,
     reason: 'time_expired' | 'tab_limit_exceeded',
@@ -274,7 +311,8 @@ export class SessionService {
 
     if (
       session.status === 'submitted' ||
-      session.status === 'force_submitted'
+      session.status === 'force_submitted' ||
+      session.status === 'graded'
     ) {
       return session;
     }
@@ -307,7 +345,9 @@ export class SessionService {
     return answers.reduce((total, a) => {
       const q = qMap.get(a.questionId);
       if (!q?.correctAnswer || q.inputType !== 'mcq') return total;
-      return a.textAnswer === q.correctAnswer ? total + q.points : total;
+      return this.isCorrectMcqAnswer(a.textAnswer, q.correctAnswer)
+        ? total + q.points
+        : total;
     }, 0);
   }
 
@@ -473,6 +513,53 @@ export class SessionService {
       ...question,
       correctAnswer: null,
     };
+  }
+
+  private isCorrectMcqAnswer(
+    submittedAnswer: string | null,
+    correctAnswer: string | null,
+  ) {
+    if (!submittedAnswer || !correctAnswer) {
+      return false;
+    }
+
+    const parsedSubmitted = this.parseStringArray(submittedAnswer);
+    const parsedCorrect = this.parseStringArray(correctAnswer);
+
+    if (parsedSubmitted && parsedCorrect) {
+      return this.compareStringArrays(parsedSubmitted, parsedCorrect);
+    }
+
+    return (
+      submittedAnswer.trim().toLowerCase() ===
+      correctAnswer.trim().toLowerCase()
+    );
+  }
+
+  private parseStringArray(value: string) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return Array.isArray(parsed)
+        ? parsed.filter((item): item is string => typeof item === 'string')
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private compareStringArrays(left: string[], right: string[]) {
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    const normalizedLeft = [...left]
+      .map((item) => item.trim().toLowerCase())
+      .sort();
+    const normalizedRight = [...right]
+      .map((item) => item.trim().toLowerCase())
+      .sort();
+
+    return normalizedLeft.every((item, index) => item === normalizedRight[index]);
   }
 
   private ensureStudentOwnsResource(

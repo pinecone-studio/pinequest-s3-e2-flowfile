@@ -1,5 +1,10 @@
+import { Suspense } from 'react'
 import { StudentResultsClient } from './StudentResultsClient'
 
 export function StudentResults() {
-  return <StudentResultsClient />
+  return (
+    <Suspense fallback={null}>
+      <StudentResultsClient />
+    </Suspense>
+  )
 }
