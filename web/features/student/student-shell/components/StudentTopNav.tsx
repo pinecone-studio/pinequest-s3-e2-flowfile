@@ -6,6 +6,12 @@ import { Bell, CheckCheck, User } from 'lucide-react'
 
 import { CURRENT_STUDENT_ID } from '@/lib/data'
 import { getNotificationEventName, getNotifications, markAllNotificationsRead, markNotificationRead } from '@/lib/notifications'
+import {
+  fetchMyNotifications,
+  isApiConfigured,
+  markAllMyNotificationsAsRead,
+  markMyNotificationAsRead,
+} from '@/lib/api/notifications'
 import { cn } from '@/lib/utils'
 import { StudentPwaControls } from '@/features/student/student-shell/components/StudentPwaControls'
 
@@ -50,55 +56,91 @@ async function showBrowserNotification(notification: AppNotification) {
   new Notification(notification.title, { body: notification.body })
 }
 
+function areNotificationsEqual(current: AppNotification[], next: AppNotification[]) {
+  return (
+    current.length === next.length &&
+    current.every((item, index) =>
+      item.id === next[index]?.id &&
+      item.isRead === next[index]?.isRead &&
+      item.createdAt === next[index]?.createdAt,
+    )
+  )
+}
+
+async function loadStudentNotifications() {
+  if (isApiConfigured()) {
+    return fetchMyNotifications()
+  }
+
+  return getNotifications(CURRENT_STUDENT_ID)
+}
+
 export function StudentTopNav({ pathname, navLinks, studentDisplayName }: StudentTopNavProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>([])
-  const hasHydrated = useRef(false)
+  const hasLoadedNotifications = useRef(false)
   const shownNotificationIds = useRef<Set<string>>(new Set())
 
   useEffect(() => {
-    const loadNotifications = () => {
-      const nextNotifications = getNotifications(CURRENT_STUDENT_ID)
-      setNotifications((current) => {
-        if (
-          current.length === nextNotifications.length &&
-          current.every((item, index) =>
-            item.id === nextNotifications[index]?.id &&
-            item.isRead === nextNotifications[index]?.isRead &&
-            item.createdAt === nextNotifications[index]?.createdAt,
-          )
-        ) {
-          return current
+    let isMounted = true
+
+    const loadNotifications = async () => {
+      try {
+        const nextNotifications = await loadStudentNotifications()
+
+        if (!isMounted) {
+          return
         }
 
-        return nextNotifications
-      })
+        if (!hasLoadedNotifications.current) {
+          nextNotifications.forEach((item) => {
+            shownNotificationIds.current.add(item.id)
+          })
+          hasLoadedNotifications.current = true
+        }
+
+        setNotifications((current) =>
+          areNotificationsEqual(current, nextNotifications) ? current : nextNotifications,
+        )
+      } catch {
+        if (!isMounted) {
+          return
+        }
+      }
     }
 
-    loadNotifications()
+    void loadNotifications()
 
-    const syncEvents = [getNotificationEventName(), 'focus', 'storage'] as const
+    const syncEvents = isApiConfigured()
+      ? (['focus'] as const)
+      : ([getNotificationEventName(), 'focus', 'storage'] as const)
+
+    const handleSync = () => {
+      void loadNotifications()
+    }
 
     syncEvents.forEach((eventName) => {
-      window.addEventListener(eventName, loadNotifications)
+      window.addEventListener(eventName, handleSync)
     })
 
+    const intervalId = isApiConfigured()
+      ? window.setInterval(handleSync, 30000)
+      : null
+
     return () => {
+      isMounted = false
+
       syncEvents.forEach((eventName) => {
-        window.removeEventListener(eventName, loadNotifications)
+        window.removeEventListener(eventName, handleSync)
       })
+
+      if (intervalId !== null) {
+        window.clearInterval(intervalId)
+      }
     }
   }, [])
 
   useEffect(() => {
-    if (!hasHydrated.current) {
-      notifications.forEach((item) => {
-        shownNotificationIds.current.add(item.id)
-      })
-      hasHydrated.current = true
-      return
-    }
-
     const nextUnread = notifications.filter((item) => !item.isRead && !shownNotificationIds.current.has(item.id))
 
     nextUnread.forEach((item) => {
@@ -111,6 +153,46 @@ export function StudentTopNav({ pathname, navLinks, studentDisplayName }: Studen
     () => notifications.filter((item) => !item.isRead).length,
     [notifications],
   )
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      if (isApiConfigured()) {
+        await markAllMyNotificationsAsRead()
+        setNotifications((current) =>
+          current.map((item) => (item.isRead ? item : { ...item, isRead: true })),
+        )
+        return
+      }
+
+      markAllNotificationsRead(CURRENT_STUDENT_ID)
+      setNotifications((current) =>
+        current.map((item) => (item.isRead ? item : { ...item, isRead: true })),
+      )
+    } catch {
+      return
+    }
+  }
+
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      if (isApiConfigured()) {
+        const updatedNotification = await markMyNotificationAsRead(notificationId)
+        setNotifications((current) =>
+          current.map((item) => (item.id === notificationId ? updatedNotification : item)),
+        )
+        return
+      }
+
+      markNotificationRead(notificationId)
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notificationId && !item.isRead ? { ...item, isRead: true } : item,
+        ),
+      )
+    } catch {
+      return
+    }
+  }
 
   return (
     <nav className="fixed inset-x-0 top-9 z-30 flex flex-col gap-3 border-b border-card-border bg-white px-4 py-3 md:h-14 md:flex-row md:items-center md:justify-between md:px-6 md:py-0">
@@ -174,7 +256,9 @@ export function StudentTopNav({ pathname, navLinks, studentDisplayName }: Studen
                 {notifications.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => markAllNotificationsRead(CURRENT_STUDENT_ID)}
+                    onClick={() => {
+                      void handleMarkAllAsRead()
+                    }}
                     className="inline-flex items-center gap-1.5 text-[12px] font-medium text-primary"
                   >
                     <CheckCheck size={14} strokeWidth={1.5} />
@@ -193,7 +277,9 @@ export function StudentTopNav({ pathname, navLinks, studentDisplayName }: Studen
                     <button
                       key={notification.id}
                       type="button"
-                      onClick={() => markNotificationRead(notification.id)}
+                      onClick={() => {
+                        void handleMarkAsRead(notification.id)
+                      }}
                       className={cn(
                         'w-full text-left px-4 py-3 border-b border-card-border/70 transition-colors',
                         notification.isRead ? 'bg-white' : 'bg-[#EEF5FF] hover:bg-[#E7F0FF]'

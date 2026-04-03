@@ -11,6 +11,7 @@ import { SessionModule } from 'src/modules/session/session.module';
 import { AnswerModule } from 'src/modules/answer/answer.module';
 import { MonitoringModule } from 'src/modules/monitoring/monitoring.module';
 import { NotificationModule } from 'src/modules/notification/notification.module';
+import { ProctoringModule } from 'src/modules/proctoring/proctoring.module';
 import { QuestionModule } from 'src/modules/question/question.module';
 import { graphqlServerConfig } from 'src/graphql/server';
 import {
@@ -36,6 +37,7 @@ import { OfflineExamSyncModule } from 'src/modules/offline-exam-sync/offline-exa
     AnswerModule,
     MonitoringModule,
     NotificationModule,
+    ProctoringModule,
     OfflineExamSyncModule,
   ],
   controllers: [AppController],

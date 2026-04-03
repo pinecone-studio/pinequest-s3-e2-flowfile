@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { NotificationRepository } from './notification.repository';
 import type { NewNotification } from 'src/shared/types';
 
@@ -28,6 +32,14 @@ export class NotificationService {
     return this.notificationRepo.findNotificationsByUser(userId);
   }
 
+  async getNotificationsByUserForRecipient(
+    requestedUserId: string,
+    recipientId: string,
+  ) {
+    this.ensureSameRecipient(requestedUserId, recipientId);
+    return this.getNotificationsByUser(recipientId);
+  }
+
   async markAsRead(id: string) {
     const notification = await this.notificationRepo.findNotificationById(id);
 
@@ -42,8 +54,28 @@ export class NotificationService {
     return this.notificationRepo.markAsRead(id);
   }
 
+  async markAsReadForRecipient(id: string, recipientId: string) {
+    const notification = await this.notificationRepo.findNotificationById(id);
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    this.ensureSameRecipient(notification.recipientId, recipientId);
+
+    if (notification.isRead) {
+      return notification;
+    }
+
+    return this.notificationRepo.markAsRead(id);
+  }
+
   async markAllAsRead(userId: string) {
     return this.notificationRepo.markAllAsRead(userId);
+  }
+
+  async markAllAsReadForRecipient(recipientId: string) {
+    return this.notificationRepo.markAllAsRead(recipientId);
   }
 
   async getUnreadCount(userId: string) {
@@ -51,5 +83,20 @@ export class NotificationService {
       userId,
       unreadCount: await this.notificationRepo.findUnreadCount(userId),
     };
+  }
+
+  async getUnreadCountForRecipient(recipientId: string) {
+    return {
+      userId: recipientId,
+      unreadCount: await this.notificationRepo.findUnreadCount(recipientId),
+    };
+  }
+
+  private ensureSameRecipient(expectedRecipientId: string, actualRecipientId: string) {
+    if (expectedRecipientId !== actualRecipientId) {
+      throw new ForbiddenException(
+        'You cannot access another user notification feed',
+      );
+    }
   }
 }

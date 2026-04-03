@@ -11,8 +11,8 @@ Use Node.js `>=21.7.3`.
 First, switch to a compatible Node version and install dependencies:
 
 ```bash
-nvm install 22
-nvm use 22
+nvm install
+nvm use
 yarn install
 ```
 

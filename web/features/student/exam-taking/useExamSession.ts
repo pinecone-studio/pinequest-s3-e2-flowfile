@@ -10,6 +10,7 @@ import {
   mapAttemptToQuestionList,
   startExamSession,
   submitExamSession,
+  type StudentProctoringViolationType,
   type StudentExamQuestion,
 } from '@/lib/api/student-exams'
 import {
@@ -83,6 +84,7 @@ export function useExamSession(id: string) {
   const latestAnswersRef = useRef<Record<string, string>>({})
   const latestQuestionsRef = useRef<StudentExamQuestion[]>([])
   const assignmentIdRef = useRef<string | null>(null)
+  const proctoringCooldownRef = useRef<Partial<Record<StudentProctoringViolationType, number>>>({})
 
   const currentStudent = getCurrentStudent()
   const currentStudentId = CURRENT_STUDENT_ID
@@ -426,24 +428,44 @@ export function useExamSession(id: string) {
     return true
   }, [currentStudentId, exam, flushPendingSaves, isApiBacked, sessionId, startedAt])
 
-  const reportVisibilityViolation = useCallback(
-    (type: 'tab_switch' | 'window_blur') => {
+  const reportProctoringViolation = useCallback(
+    (
+      input:
+        | StudentProctoringViolationType
+        | {
+            type: StudentProctoringViolationType
+            details?: string
+            metadata?: Record<string, string | number | boolean | null>
+          },
+    ) => {
       if (!isApiBacked || !exam) {
         return
       }
 
+      const payload = typeof input === 'string' ? { type: input } : input
+      const now = Date.now()
+      const lastReportedAt = proctoringCooldownRef.current[payload.type] ?? 0
+      const cooldownMs =
+        payload.type === 'tab_switch' || payload.type === 'window_blur'
+          ? 5_000
+          : 20_000
+
+      if (now - lastReportedAt < cooldownMs) {
+        return
+      }
+
+      proctoringCooldownRef.current[payload.type] = now
+
       void createProctoringViolation({
-        teacherId: exam.teacherId ?? '',
-        studentId: currentStudentId,
-        studentName: currentStudentName,
         examId: exam.id,
-        examTitle: exam.title,
         assignmentId: assignmentIdRef.current ?? exam.id,
         sessionId: sessionId ?? undefined,
-        type,
+        type: payload.type,
+        details: payload.details,
+        metadata: payload.metadata,
       }).catch(() => null)
     },
-    [currentStudentId, currentStudentName, exam, isApiBacked, sessionId],
+    [exam, isApiBacked, sessionId],
   )
 
   const formatTime = (seconds: number) => {
@@ -473,7 +495,7 @@ export function useExamSession(id: string) {
     setMarkedForReview,
     setAnswerValue,
     submitCurrentSession,
-    reportVisibilityViolation,
+    reportProctoringViolation,
     formatTime,
     startedAt,
   }

@@ -19,6 +19,14 @@ export class CreateEventDto {
     'return_to_exam',
     'window_blur',
     'devtools_open',
+    'face_not_detected',
+    'multiple_faces_detected',
+    'audio_detected',
+    'device_changed',
+    'looking_left',
+    'looking_right',
+    'looking_up',
+    'looking_down',
   ])
   eventType: MonitoringEventType;
 

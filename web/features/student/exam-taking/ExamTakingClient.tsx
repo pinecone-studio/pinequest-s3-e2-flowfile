@@ -410,7 +410,7 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
         onToggleMark={toggleMarkForReview}
         proctoringPreview={
           <StudentProctoringPreview
-            onVisibilityViolation={session.reportVisibilityViolation}
+            onProctoringViolation={session.reportProctoringViolation}
           />
         }
       />
