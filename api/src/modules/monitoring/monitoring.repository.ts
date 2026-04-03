@@ -64,4 +64,8 @@ export class MonitoringRepository {
       limit,
     });
   }
+
+  async findAllEvents() {
+    return db.query.suspiciousEvents.findMany({ orderBy: desc(suspiciousEvents.occurredAt) });
+  }
 }
