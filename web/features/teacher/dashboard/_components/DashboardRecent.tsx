@@ -9,7 +9,10 @@ interface RecentItem {
   results: Result[]
 }
 
-const fmt = (d: string) => { const date = new Date(d); return `${date.getMonth() + 1}-р сарын ${date.getDate()}` }
+function formatDate(d: string) {
+  const dt = new Date(d)
+  return `${dt.getMonth() + 1}-р сарын ${dt.getDate()}`
+}
 
 export function DashboardRecent({ items }: { items: RecentItem[] }) {
   return (
@@ -27,7 +30,9 @@ export function DashboardRecent({ items }: { items: RecentItem[] }) {
           <div key={assignment.id} className="flex items-center gap-3 p-3 rounded-[8px] border-l-4 mb-2" style={{ borderLeftColor: subCol, background: '#FAFAFA' }}>
             <div className="flex-1 min-w-0">
               <div className="font-medium text-[14px] truncate" style={{ color: '#1A1A2E' }}>{exam.title}</div>
-              <div className="text-[12px]" style={{ color: '#5A6474' }}>{SUBJECT_NAMES[exam.subjectId] || exam.subjectId} · {cls.name} · {fmt(assignment.scheduledStart)}</div>
+              <div className="text-[12px]" style={{ color: '#5A6474' }}>
+                {SUBJECT_NAMES[exam.subjectId] || exam.subjectId} · {cls.name} · {formatDate(assignment.scheduledStart)}
+              </div>
               <div className="flex gap-0.5 mt-1">
                 {buckets.map((b, i) => (
                   <div key={i} style={{ flex: 1, height: 4, background: (['#E8112D','#F97316','#B45309','#0066FF','#1A7A4A'][i]) + (maxB > 0 ? Math.round(b / maxB * 200 + 55).toString(16).padStart(2, '0') : '44'), borderRadius: 2 }} />
