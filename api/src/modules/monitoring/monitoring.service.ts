@@ -141,6 +141,10 @@ export class MonitoringService {
     };
   }
 
+  async getAllEvents() {
+    return this.monitoringRepo.findAllEvents();
+  }
+
   async getLiveFeed(examId: string, user?: AuthenticatedUser) {
     if (user) {
       await this.ensureTeacherOwnsExam(examId, user.id);
