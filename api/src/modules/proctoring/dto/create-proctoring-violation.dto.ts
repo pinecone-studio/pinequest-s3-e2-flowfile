@@ -14,6 +14,10 @@ export const PROCTORING_VIOLATION_TYPES = [
   'window_blur',
   'audio_detected',
   'device_changed',
+  'looking_left',
+  'looking_right',
+  'looking_up',
+  'looking_down',
 ] as const;
 
 export enum ProctoringSeverity {
@@ -23,27 +27,36 @@ export enum ProctoringSeverity {
 }
 
 export class CreateProctoringViolationDto {
+  @IsOptional()
   @IsString()
-  teacherId: string;
+  teacherId?: string;
 
   @IsOptional()
   @IsString()
   teacherName?: string;
 
+  @IsOptional()
   @IsString()
-  studentId: string;
+  studentId?: string;
 
+  @IsOptional()
   @IsString()
-  studentName: string;
+  studentName?: string;
 
   @IsString()
   examId: string;
 
+  @IsOptional()
   @IsString()
-  examTitle: string;
+  examTitle?: string;
 
+  @IsOptional()
   @IsString()
-  assignmentId: string;
+  assignmentId?: string;
+
+  @IsOptional()
+  @IsString()
+  sessionId?: string;
 
   @IsOptional()
   @IsString()

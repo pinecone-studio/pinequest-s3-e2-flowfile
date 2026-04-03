@@ -386,24 +386,30 @@ export async function runPreviewCode(code: string) {
   })
 }
 
+export type StudentProctoringViolationType =
+  | 'face_not_detected'
+  | 'multiple_faces_detected'
+  | 'tab_switch'
+  | 'window_blur'
+  | 'audio_detected'
+  | 'device_changed'
+  | 'looking_left'
+  | 'looking_right'
+  | 'looking_up'
+  | 'looking_down'
+
 export async function createProctoringViolation(payload: {
-  teacherId: string
-  studentId: string
-  studentName: string
+  teacherId?: string
+  studentId?: string
+  studentName?: string
   examId: string
-  examTitle: string
-  assignmentId: string
+  examTitle?: string
+  assignmentId?: string
   sessionId?: string
   teacherName?: string
   classId?: string
   className?: string
-  type:
-    | 'face_not_detected'
-    | 'multiple_faces_detected'
-    | 'tab_switch'
-    | 'window_blur'
-    | 'audio_detected'
-    | 'device_changed'
+  type: StudentProctoringViolationType
   details?: string
   metadata?: Record<string, string | number | boolean | null>
 }) {
@@ -417,7 +423,6 @@ export async function createProctoringViolation(payload: {
       ...payload,
       metadata: {
         ...(payload.metadata ?? {}),
-        ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
       },
     }),
   })

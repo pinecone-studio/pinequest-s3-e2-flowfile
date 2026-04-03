@@ -47,6 +47,12 @@ export class SessionRepository {
     });
   }
 
+  async findAllSessions(): Promise<Session[]> {
+    return db.query.examSessions.findMany({
+      orderBy: desc(examSessions.createdAt),
+    });
+  }
+
   async createSession(data: NewSession) {
     const [session] = await db.insert(examSessions).values(data).returning();
     return session;

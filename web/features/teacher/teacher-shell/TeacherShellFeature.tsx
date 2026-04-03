@@ -3,6 +3,7 @@
 import { Menu } from 'lucide-react'
 
 import { TeacherMobileCloseButton, TeacherSidebar } from '@/features/teacher/teacher-shell/components/TeacherSidebar'
+import { useTeacherLiveProctoringAlerts } from '@/features/teacher/teacher-shell/hooks/useTeacherLiveProctoringAlerts'
 import { useTeacherShell } from '@/features/teacher/teacher-shell/hooks/useTeacherShell'
 import { teacherNavItems } from '@/features/teacher/teacher-shell/utils/teacher-shell.constants'
 
@@ -11,6 +12,8 @@ type TeacherShellFeatureProps = {
 }
 
 export function TeacherShellFeature({ children }: TeacherShellFeatureProps) {
+  useTeacherLiveProctoringAlerts()
+
   const {
     collapsed,
     setCollapsed,

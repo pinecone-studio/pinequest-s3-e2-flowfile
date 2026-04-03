@@ -4,7 +4,11 @@ export type ProctoringViolationType =
   | 'tab_switch'
   | 'window_blur'
   | 'audio_detected'
-  | 'device_changed';
+  | 'device_changed'
+  | 'looking_left'
+  | 'looking_right'
+  | 'looking_up'
+  | 'looking_down';
 
 export type ProctoringSeverity = 'low' | 'medium' | 'high';
 
@@ -19,8 +23,8 @@ export interface ProctoringViolation {
   assignmentId: string;
   classId: string | null;
   className: string | null;
-  type: string;
-  severity: string;
+  type: ProctoringViolationType;
+  severity: ProctoringSeverity;
   details: string | null;
   metadataJson: string | null;
   createdAt: Date;
