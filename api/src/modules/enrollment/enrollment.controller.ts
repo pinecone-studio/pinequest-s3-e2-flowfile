@@ -11,6 +11,11 @@ export class EnrollmentController {
     return this.enrollmentService.enrollStudent(body.examId, body.studentId);
   }
 
+  @Post('bulk')
+  enrollStudents(@Body() body: { examId: string; studentIds: string[] }) {
+    return this.enrollmentService.enrollStudents(body.examId, body.studentIds);
+  }
+
   @Get('exam/:examId')
   getEnrollmentsByExam(@Param('examId') examId: string) {
     return this.enrollmentService.getEnrollmentsByExam(examId);

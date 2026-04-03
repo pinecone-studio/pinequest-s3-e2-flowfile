@@ -49,7 +49,7 @@ export function QuestionBankClient() {
   const getOwnerName = (ownerId: string) => users.find(u => u.id === ownerId)?.name || '-'
   const getExamQuestions = (exam: Exam) => questions.filter(q => exam.questionIds.includes(q.id))
   const getTotalPoints = (exam: Exam) => getExamQuestions(exam).reduce((sum, q) => sum + q.points, 0)
-  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('mn-MN', { year: 'numeric', month: 'short', day: 'numeric' })
+  const formatDate = (dateStr: string) => { const dt = new Date(dateStr); return `${dt.getFullYear()}.${dt.getMonth()+1}.${dt.getDate()}` }
 
   useEffect(() => {
     if (!printExam) {

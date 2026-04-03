@@ -4,16 +4,9 @@ import { useEffect, useState } from 'react'
 import { FileText } from 'lucide-react'
 import { fetchAssignedExams, type StudentExamSummary } from '@/lib/api/student-exams'
 import { isApiConfigured } from '@/lib/api/client'
-import { getAll, CURRENT_STUDENT_ID } from '@/lib/data'
+import { CURRENT_STUDENT_ID, initialExams, initialExamAssignments, initialAttempts, initialUsers, initialClasses } from '@/lib/data'
 import type { Exam, ExamAssignment, Attempt, User as UserType, SchoolClass } from '@/lib/types'
 import { formatMongolianShortDateTime } from '@/lib/date-time'
-import {
-  initialExams,
-  initialExamAssignments,
-  initialAttempts,
-  initialUsers,
-  initialClasses,
-} from '@/lib/data'
 import { StudentStatCards } from './_components/StudentStatCards'
 import { ExamTabFilter } from './_components/ExamTabFilter'
 import { ExamAssignmentCard } from './_components/ExamAssignmentCard'
@@ -28,33 +21,12 @@ export function StudentDashboardClient() {
   const [activeTab, setActiveTab] = useState<'available' | 'completed'>('available')
 
   useEffect(() => {
-    let isMounted = true
-
-    if (isApiConfigured()) {
-      void fetchAssignedExams()
-        .then((data) => {
-          if (isMounted) {
-            setAssignedExams(data)
-          }
-        })
-        .catch(() => null)
-    }
-
-    const loadedExams = getAll<Exam>('exams')
-    const loadedAssignments = getAll<ExamAssignment>('examAssignments')
-    const loadedAttempts = getAll<Attempt>('attempts')
-    const loadedUsers = getAll<UserType>('users')
-    const loadedClasses = getAll<SchoolClass>('classes')
-
-    if (loadedExams.length) setExams(loadedExams)
-    if (loadedAssignments.length) setAssignments(loadedAssignments)
-    if (loadedAttempts.length) setAttempts(loadedAttempts)
-    if (loadedUsers.length) setUsers(loadedUsers)
-    if (loadedClasses.length) setClasses(loadedClasses)
-
-    return () => {
-      isMounted = false
-    }
+    if (!isApiConfigured()) return
+    let mounted = true
+    const load = () => fetchAssignedExams().then(d => { if (mounted) setAssignedExams(d) }).catch(() => null)
+    load()
+    const iv = setInterval(load, 30000)
+    return () => { mounted = false; clearInterval(iv) }
   }, [])
 
   if (assignedExams) {

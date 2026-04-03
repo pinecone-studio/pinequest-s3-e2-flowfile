@@ -7,16 +7,13 @@ import { cn } from '@/lib/utils'
 const tabs = [
   { label: 'Багш', href: '/teacher' },
   { label: 'Сурагч', href: '/student' },
-  { label: 'Захиргаа', href: '/admin' },
 ]
 
 export function PlatformSwitcher() {
   const pathname = usePathname()
   
   const getActiveTab = () => {
-    if (pathname.startsWith('/teacher')) return '/teacher'
     if (pathname.startsWith('/student')) return '/student'
-    if (pathname.startsWith('/admin')) return '/admin'
     return '/teacher'
   }
   

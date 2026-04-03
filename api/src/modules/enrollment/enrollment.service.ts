@@ -45,6 +45,18 @@ export class EnrollmentService {
     return this.enrollmentRepo.findEnrollmentsByStudent(studentId);
   }
 
+  async enrollStudents(examId: string, studentIds: string[]) {
+    const results: Awaited<ReturnType<typeof this.enrollStudent>>[] = [];
+    for (const studentId of studentIds) {
+      try {
+        results.push(await this.enrollStudent(examId, studentId));
+      } catch {
+        // skip duplicates
+      }
+    }
+    return results;
+  }
+
   async removeEnrollment(examId: string, studentId: string) {
     return this.enrollmentRepo.removeEnrollment(examId, studentId);
   }

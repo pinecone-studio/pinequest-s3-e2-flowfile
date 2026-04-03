@@ -13,7 +13,6 @@ import { QuestionEditorDialog } from './_components/QuestionEditorDialog'
 import { StepIndicator } from './_components/StepIndicator'
 import { StepQuestions } from './_components/StepQuestions'
 import { StepSchedule } from './_components/StepSchedule'
-import { StepSource } from './_components/StepSource'
 import {
   generateDemoQuestions,
   generateMockAIQuestions,
@@ -25,7 +24,7 @@ import {
   stepLabels,
 } from './createExamUtils'
 
-type Step = 1 | 2 | 3 | 4
+type Step = 1 | 2 | 3
 type QuestionTab = 'new' | 'bank' | 'ai' | 'file'
 
 export function CreateExamClient() {
@@ -34,7 +33,6 @@ export function CreateExamClient() {
   const [courses, setCourses] = useState<Course[]>(initialCourses)
   const [classes, setClasses] = useState<SchoolClass[]>(initialClasses)
   const [existingQuestions, setExistingQuestions] = useState<Question[]>(initialQuestions)
-  const [source, setSource] = useState<'new' | 'bank'>('new')
   const [title, setTitle] = useState('')
   const [courseId, setCourseId] = useState('')
   const [chapter, setChapter] = useState('')
@@ -74,18 +72,9 @@ export function CreateExamClient() {
     const localCourses = getAll<Course>('courses')
     const localClasses = getAll<SchoolClass>('classes')
     const localQuestions = getAll<Question>('questions')
-
-    if (localCourses.length > 0) {
-      setCourses(localCourses)
-    }
-
-    if (localClasses.length > 0) {
-      setClasses(localClasses)
-    }
-
-    if (localQuestions.length > 0) {
-      setExistingQuestions(localQuestions)
-    }
+    if (localCourses.length > 0) setCourses(localCourses)
+    if (localClasses.length > 0) setClasses(localClasses)
+    if (localQuestions.length > 0) setExistingQuestions(localQuestions)
   }, [])
 
   const selectedCourse = courses.find((course) => course.id === courseId)
@@ -119,10 +108,7 @@ export function CreateExamClient() {
   }
 
   const handleAddQuestion = () => {
-    if (!questionText.trim()) {
-      return
-    }
-
+    if (!questionText.trim()) return
     const newQuestion: Question = {
       id: `q-new-${Date.now()}`,
       examId: '',
@@ -132,7 +118,6 @@ export function CreateExamClient() {
       order: questions.length + 1,
       isManualGrade: isManualQuestionType(questionType),
     }
-
     if (questionType === 'single' || questionType === 'multiple') {
       newQuestion.options = questionOptions.filter((option) => option.trim())
       newQuestion.correctAnswer = correctAnswer
@@ -143,14 +128,13 @@ export function CreateExamClient() {
         (pair) => pair.left.trim() && pair.right.trim(),
       )
     }
-
-    setQuestions((previousQuestions) => [...previousQuestions, newQuestion])
+    setQuestions((prev) => [...prev, newQuestion])
     resetQuestionForm()
   }
 
   const handleAddFromBank = () => {
-    setQuestions((previousQuestions) => [
-      ...previousQuestions,
+    setQuestions((prev) => [
+      ...prev,
       ...existingQuestions.filter((question) => selectedBankQuestions.includes(question.id)),
     ])
     setSelectedBankQuestions([])
@@ -158,51 +142,34 @@ export function CreateExamClient() {
 
   const handleAiGenerate = async () => {
     setAiGenerating(true)
-
     await new Promise((resolve) => setTimeout(resolve, 2000))
-
     setAiGeneratedQuestions(generateMockAIQuestions(aiTopic, aiDifficulty, aiCount))
     setAiGenerating(false)
   }
 
   const handleAddAiQuestions = (ids: string[]) => {
-    setQuestions((previousQuestions) => [
-      ...previousQuestions,
+    setQuestions((prev) => [
+      ...prev,
       ...aiGeneratedQuestions.filter((question) => ids.includes(question.id)),
     ])
-    setAiGeneratedQuestions((previousQuestions) =>
-      previousQuestions.filter((question) => !ids.includes(question.id)),
-    )
+    setAiGeneratedQuestions((prev) => prev.filter((question) => !ids.includes(question.id)))
   }
 
   const importFiles = async (fileList: FileList | null) => {
     const files = fileList ? Array.from(fileList) : []
-
-    if (files.length === 0) {
-      return
-    }
-
+    if (files.length === 0) return
     setImportingFile(true)
     setImportFileName(files.length === 1 ? files[0].name : `${files.length} файл`)
-
     try {
-      const { collected, failures } = await processImportFiles(
-        files,
-        title,
-        selectedCourseLabel,
-      )
+      const { collected, failures } = await processImportFiles(files, title, selectedCourseLabel)
       const importedQuestions = mapImportedQuestions(collected, questions.length)
-
       if (importedQuestions.length === 0) {
         throw new Error('Сонгосон файл эсвэл хавтсаас асуулт олдсонгүй.')
       }
-
-      setQuestions((previousQuestions) => [...previousQuestions, ...importedQuestions])
+      setQuestions((prev) => [...prev, ...importedQuestions])
       setQuestionTab('new')
-
       if (failures.length > 0) {
         const [firstFailure] = failures
-
         toast({
           variant: 'destructive',
           title: `${failures.length} файл алгасагдлаа`,
@@ -233,11 +200,7 @@ export function CreateExamClient() {
 
   const handleFillGeneralInfoDemo = () => {
     const demoCourse = selectedCourse ?? courses[0]
-
-    if (!demoCourse) {
-      return
-    }
-
+    if (!demoCourse) return
     const subjectName = SUBJECT_NAMES[demoCourse.subjectId] ?? demoCourse.subjectId
     setCourseId(demoCourse.id)
     setTitle(`${subjectName} - 1-р улирлын шалгалт`)
@@ -254,20 +217,12 @@ export function CreateExamClient() {
     const subjectName = selectedCourse
       ? SUBJECT_NAMES[selectedCourse.subjectId] ?? selectedCourse.subjectId
       : 'Ерөнхий'
-
-    setQuestions((previousQuestions) => [
-      ...previousQuestions,
-      ...generateDemoQuestions(subjectName, previousQuestions.length),
-    ])
+    setQuestions((prev) => [...prev, ...generateDemoQuestions(subjectName, prev.length)])
   }
 
   const handleSaveExam = async () => {
-    if (!selectedCourse || saving) {
-      return
-    }
-
+    if (!selectedCourse || saving) return
     setSaving(true)
-
     try {
       await saveExamPayload({
         questions,
@@ -286,7 +241,6 @@ export function CreateExamClient() {
         endTime,
         classes,
       })
-
       router.push('/teacher/exams')
     } catch (error) {
       toast({
@@ -300,45 +254,24 @@ export function CreateExamClient() {
   }
 
   const handleRemoveQuestion = (index: number) => {
-    setQuestions((previousQuestions) =>
-      previousQuestions
-        .filter((_, questionIndex) => questionIndex !== index)
-        .map((question, questionIndex) => ({
-          ...question,
-          order: questionIndex + 1,
-        })),
+    setQuestions((prev) =>
+      prev
+        .filter((_, i) => i !== index)
+        .map((question, i) => ({ ...question, order: i + 1 })),
     )
-
-    setEditingQuestionIndex((previousIndex) => {
-      if (previousIndex === null) {
-        return previousIndex
-      }
-
-      if (previousIndex === index) {
-        return null
-      }
-
-      if (previousIndex > index) {
-        return previousIndex - 1
-      }
-
-      return previousIndex
+    setEditingQuestionIndex((prev) => {
+      if (prev === null) return prev
+      if (prev === index) return null
+      if (prev > index) return prev - 1
+      return prev
     })
   }
 
   const handleUpdateQuestion = (updatedQuestion: Question) => {
-    if (editingQuestionIndex === null) {
-      return
-    }
-
-    setQuestions((previousQuestions) =>
-      previousQuestions.map((question, questionIndex) =>
-        questionIndex === editingQuestionIndex
-          ? {
-              ...updatedQuestion,
-              order: questionIndex + 1,
-            }
-          : question,
+    if (editingQuestionIndex === null) return
+    setQuestions((prev) =>
+      prev.map((question, i) =>
+        i === editingQuestionIndex ? { ...updatedQuestion, order: i + 1 } : question,
       ),
     )
     setEditingQuestionIndex(null)
@@ -346,14 +279,9 @@ export function CreateExamClient() {
 
   const canProceed = () => {
     switch (currentStep) {
-      case 1:
-        return true
-      case 2:
-        return Boolean(title.trim() && courseId)
-      case 3:
-        return questions.length > 0
-      case 4:
-        return true
+      case 1: return Boolean(title.trim() && courseId)
+      case 2: return questions.length > 0
+      case 3: return true
     }
   }
 
@@ -377,8 +305,7 @@ export function CreateExamClient() {
           onStepClick={(step) => setCurrentStep(step as Step)}
         />
         <div className="flex-1 overflow-y-auto p-8">
-          {currentStep === 1 && <StepSource source={source} onChange={setSource} />}
-          {currentStep === 2 && (
+          {currentStep === 1 && (
             <StepBasicInfo
               title={title}
               courseId={courseId}
@@ -398,7 +325,7 @@ export function CreateExamClient() {
               onDemo={handleFillGeneralInfoDemo}
             />
           )}
-          {currentStep === 3 && (
+          {currentStep === 2 && (
             <StepQuestions
               questionTab={questionTab}
               questionText={questionText}
@@ -438,7 +365,7 @@ export function CreateExamClient() {
               onDemo={handleAddDemoQuestions}
             />
           )}
-          {currentStep === 4 && (
+          {currentStep === 3 && (
             <StepSchedule
               courseId={courseId}
               selectedClasses={selectedClasses}
@@ -457,7 +384,7 @@ export function CreateExamClient() {
         </div>
         <div className="px-8 py-4 bg-white border-t border-card-border flex items-center justify-between">
           <button
-            onClick={() => setCurrentStep((previousStep) => Math.max(1, previousStep - 1) as Step)}
+            onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1) as Step)}
             disabled={currentStep === 1}
             className="px-4 py-2 border border-card-border rounded-lg text-[13px] font-medium text-foreground hover:bg-table-header transition-colors disabled:opacity-50"
           >
@@ -466,11 +393,9 @@ export function CreateExamClient() {
           <span className="text-[13px] text-text-secondary">
             {questions.length} асуулт • {totalPoints} оноо
           </span>
-          {currentStep < 4 ? (
+          {currentStep < 3 ? (
             <button
-              onClick={() =>
-                setCurrentStep((previousStep) => Math.min(4, previousStep + 1) as Step)
-              }
+              onClick={() => setCurrentStep((prev) => Math.min(3, prev + 1) as Step)}
               disabled={!canProceed()}
               className="px-4 py-2 bg-primary text-white rounded-lg text-[13px] font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-1.5"
             >
@@ -494,9 +419,7 @@ export function CreateExamClient() {
         question={editingQuestion}
         questionNumber={editingQuestionIndex !== null ? editingQuestionIndex + 1 : undefined}
         onOpenChange={(open) => {
-          if (!open) {
-            setEditingQuestionIndex(null)
-          }
+          if (!open) setEditingQuestionIndex(null)
         }}
         onSave={handleUpdateQuestion}
       />

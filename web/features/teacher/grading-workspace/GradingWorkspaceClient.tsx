@@ -630,7 +630,7 @@ export function GradingWorkspaceClient({
                     <span>
                       Өгсөн:{' '}
                       {selectedSession.submittedAt
-                        ? new Date(selectedSession.submittedAt).toLocaleString('mn-MN')
+                        ? (() => { const dt = new Date(selectedSession.submittedAt); return `${dt.getFullYear()}.${dt.getMonth()+1}.${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}` })()
                         : '—'}
                     </span>
                   </div>

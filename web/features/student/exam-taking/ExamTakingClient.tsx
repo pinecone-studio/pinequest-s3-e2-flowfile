@@ -386,10 +386,7 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
               <div className="mt-4 flex items-center gap-1.5 text-[12px] text-text-secondary">
                 <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
                 Автоматаар хадгалагдсан{' '}
-                {session.lastSaved.toLocaleTimeString('mn-MN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {`${String(session.lastSaved.getHours()).padStart(2,'0')}:${String(session.lastSaved.getMinutes()).padStart(2,'0')}`}
               </div>
             )}
           </div>

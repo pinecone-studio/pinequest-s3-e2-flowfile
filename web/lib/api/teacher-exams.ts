@@ -131,6 +131,19 @@ export function mapTeacherApiQuestionToLocalQuestion(
   }
 }
 
+export interface ExamDetailResponse {
+  exam: TeacherExam
+  questions: Array<{ id: string; content: string; inputType: string; points: number; orderIndex: number; isRequired: boolean; optionsJson: string|null; correctAnswer: string|null }>
+  sessions: ExamSession[]
+  enrollments: Array<{ id: string; examId: string; studentId: string; assignedAt: string }>
+  submitted: ExamSession[]
+  visualStage: string
+  totalEnrolled: number
+  totalSubmitted: number
+  allSubmitted: boolean
+  needsGrading: boolean
+}
+
 export async function fetchMyExams(): Promise<TeacherExam[]> {
   return apiFetch<TeacherExam[]>('/exams', undefined, 'teacher')
 }
@@ -185,6 +198,14 @@ export async function fetchEnrollmentsByExam(
     undefined,
     'teacher',
   )
+}
+
+export async function fetchExamDetail(examId: string): Promise<ExamDetailResponse> {
+  return apiFetch<ExamDetailResponse>(`/exams/${examId}/detail`, undefined, 'teacher')
+}
+
+export async function enrollStudents(examId: string, studentIds: string[]): Promise<void> {
+  await apiFetch(`/enrollments/bulk`, { method: 'POST', body: JSON.stringify({ examId, studentIds }) }, 'teacher')
 }
 
 export async function createExam(payload: {

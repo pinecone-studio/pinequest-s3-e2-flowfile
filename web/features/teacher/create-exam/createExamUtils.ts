@@ -11,7 +11,7 @@ export type ImportedQuestionPayload = {
 export type ImportApiResponse = { questions?: ImportedQuestionPayload[]; parser?: string; error?: string }
 export type ImportFailure = { fileName: string; reason: string }
 
-export const stepLabels = ['Эх сурвалж', 'Ерөнхий мэдээлэл', 'Асуултууд', 'Хуваарь']
+export const stepLabels = ['Ерөнхий мэдээлэл', 'Асуултууд', 'Хуваарь']
 const MANUAL_QUESTION_TYPES: QuestionType[] = ['short', 'long', 'formula', 'chemistry', 'code', 'voice', 'video', 'handwritten']
 
 function getDevAuthHeaders() {

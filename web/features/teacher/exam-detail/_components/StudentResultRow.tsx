@@ -1,6 +1,12 @@
 import { CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
 import type { User, Result } from '@/lib/types'
 
+function fmtDateTime(d: string) {
+  if (!d) return '-'
+  const dt = new Date(d)
+  return `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
+}
+
 function getScoreColor(score: number) {
   if (score >= 80) return '#1A7A4A'
   if (score >= 60) return '#B45309'
@@ -62,14 +68,7 @@ export function StudentResultRow({
         )}
       </td>
       <td className="px-4 py-3 text-[13px]" style={{ color: '#5A6474' }}>
-        {result
-          ? new Date(result.submittedAt ?? '').toLocaleString('mn-MN', {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : '-'}
+        {result ? fmtDateTime(result.submittedAt ?? '') : '-'}
       </td>
     </tr>
   )

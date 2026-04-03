@@ -13,7 +13,7 @@ export function StepIndicator({
   return (
     <div className="px-8 py-4 bg-white border-b border-card-border">
       <div className="flex items-center justify-center">
-        {[1, 2, 3, 4].map((step, index) => (
+        {[1, 2, 3].map((step, index) => (
           <div key={step} className="flex items-center">
             <button
               onClick={() => step < currentStep && onStepClick(step)}
@@ -32,7 +32,7 @@ export function StepIndicator({
                 {stepLabels[index]}
               </span>
             </button>
-            {index < 3 && (
+            {index < 2 && (
               <div className={cn('w-20 h-[2px] mx-3 mt-[-16px]', currentStep > step ? 'bg-green-500' : 'bg-card-border')} />
             )}
           </div>

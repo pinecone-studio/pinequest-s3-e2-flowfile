@@ -34,6 +34,14 @@ export class ExamController {
     return this.examService.getMyExams(user.id);
   }
 
+  @Get(':id/detail')
+  getExamDetail(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.examService.getExamDetail(id, user.id);
+  }
+
   @Get(':id')
   getExamById(@Param('id') id: string) {
     return this.examService.getExamById(id);

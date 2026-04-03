@@ -31,7 +31,7 @@ export function QuestionDetailClient({ params }: { params: Promise<{ id: string 
   const examQuestions = exam ? questions.filter(q => exam.questionIds.includes(q.id)) : []
   const isOwner = exam?.ownerId === CURRENT_TEACHER_ID
 
-  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('mn-MN', { year: 'numeric', month: 'long', day: 'numeric' })
+  const formatDate = (dateStr: string) => { const dt = new Date(dateStr); return `${dt.getFullYear()} оны ${dt.getMonth()+1}-р сарын ${dt.getDate()}` }
   const getTotalPoints = () => examQuestions.reduce((sum, q) => sum + q.points, 0)
   const getQuestionTypeCounts = () => { const counts: Record<string, number> = {}; examQuestions.forEach(q => { counts[q.type] = (counts[q.type] || 0) + 1 }); return counts }
 

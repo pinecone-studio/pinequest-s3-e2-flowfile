@@ -726,23 +726,20 @@ function parseSingleQuestionBlockLocally(
 }
 
 function extractQuestionsLocally(text: string, subjectProfile: SubjectProfile): ImportedQuestionPayload[] {
-  return segmentQuestionBlocksLocally(text, subjectProfile).reduce<ImportedQuestionPayload[]>(
-    (result, block) => {
+  return segmentQuestionBlocksLocally(text, subjectProfile)
+    .flatMap(block => {
       const parsed = parseSingleQuestionBlockLocally(block.rawBlock, subjectProfile, block.sectionType)
-      if (!parsed) return result
+      if (!parsed) return []
 
       const sharedPrefix = normalizeWhitespace(block.sharedContext ?? '')
       const question = sharedPrefix ? normalizeWhitespace(`${sharedPrefix} ${parsed.question ?? ''}`) : parsed.question
-      result.push({
+      const result: ImportedQuestionPayload = {
         ...parsed,
         question,
-        imageUrl: block.imageMarker || '',
-      })
-
-      return result
-    },
-    [],
-  )
+        imageUrl: block.imageMarker || undefined,
+      }
+      return [result]
+    })
 }
 
 function looksLikeBadQuestion(q: ImportedQuestionPayload) {

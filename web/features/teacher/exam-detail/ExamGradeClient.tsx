@@ -69,7 +69,7 @@ export function ExamGradeClient({ params }: { params: Promise<{ id: string }> })
                   <h2 className="text-[15px] font-semibold text-foreground">{selectedStudent.name}</h2>
                   <div className="flex items-center gap-3 text-[12px] text-text-secondary">
                     <span>{(selectedStudent as UserType & { studentId?: string }).studentId}</span><span>•</span>
-                    <span>Өгсөн: {new Date(selectedSubmission.submittedAt || '').toLocaleString('mn-MN')}</span>
+                    <span>Өгсөн: {(() => { const dt = new Date(selectedSubmission.submittedAt || ''); return `${dt.getFullYear()}.${dt.getMonth()+1}.${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}` })()}</span>
                   </div>
                 </div>
               </div>

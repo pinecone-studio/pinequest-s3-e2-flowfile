@@ -39,7 +39,7 @@ export function ExamListClient() {
     return (initialCourses ?? []).find(c => (c.classIds ?? []).includes(cls.id)) || null
   }
 
-  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('mn-MN', { month: 'short', day: 'numeric' })
+  const formatDate = (dateStr: string) => { const dt = new Date(dateStr); return `${dt.getMonth()+1}/${dt.getDate()}` }
 
   const getExamStats = (assignmentId: string) => {
     const cls = (initialClasses ?? []).find(c => {

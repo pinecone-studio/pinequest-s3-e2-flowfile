@@ -6,11 +6,13 @@ import { STATUS_CONFIG } from '@/lib/constants'
 type ExamStats = { avg: number; completed: number; total: number } | null
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('mn-MN', { month: 'short', day: 'numeric' })
+  const dt = new Date(dateStr)
+  return `${dt.getMonth()+1}-р сарын ${dt.getDate()}`
 }
 
 function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString('mn-MN', { hour: '2-digit', minute: '2-digit' })
+  const dt = new Date(dateStr)
+  return `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`
 }
 
 export function ClassExamRow({

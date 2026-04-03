@@ -157,6 +157,63 @@ export class ExamService {
     return updatedExam;
   }
 
+  async getExamDetail(examId: string, teacherId: string) {
+    const exam = await this.examRepo.findExamById(examId);
+    if (!exam) throw new NotFoundException('Exam not found');
+    if (exam.teacherId !== teacherId) throw new ForbiddenException();
+    const [questions, sessions, enrollments] = await Promise.all([
+      this.questionRepo.findQuestionsByExam(examId),
+      this.sessionRepo.findSessionsByExam(examId),
+      this.enrollmentRepo.findEnrollmentsByExam(examId),
+    ]);
+    const submitted = sessions.filter(
+      (s) => s.status === 'submitted' || s.status === 'force_submitted',
+    );
+    const allSubmitted =
+      enrollments.length > 0 && submitted.length >= enrollments.length;
+    const needsGrading = submitted.some((s) => s.score === null);
+    const now = new Date();
+    const startsAt = exam.startsAt ? new Date(exam.startsAt) : null;
+    const endsAt = exam.endsAt ? new Date(exam.endsAt) : null;
+    let visualStage: string;
+    if (exam.status === 'draft') {
+      visualStage = 'draft';
+    } else if (
+      (exam.status === 'scheduled' || exam.status === 'published') &&
+      startsAt &&
+      now < startsAt
+    ) {
+      visualStage = 'scheduled';
+    } else if (
+      exam.status === 'published' &&
+      startsAt &&
+      now >= startsAt &&
+      (!endsAt || now <= endsAt)
+    ) {
+      visualStage = 'active';
+    } else if (exam.status === 'closed' && !allSubmitted) {
+      visualStage = 'submitted';
+    } else if (exam.status === 'closed' && allSubmitted && needsGrading) {
+      visualStage = 'grading';
+    } else if (exam.status === 'closed' && allSubmitted && !needsGrading) {
+      visualStage = 'reported';
+    } else {
+      visualStage = exam.status;
+    }
+    return {
+      exam,
+      questions,
+      sessions,
+      enrollments,
+      submitted,
+      visualStage,
+      totalEnrolled: enrollments.length,
+      totalSubmitted: submitted.length,
+      allSubmitted,
+      needsGrading,
+    };
+  }
+
   async deleteExam(id: string, teacherId: string) {
     const exam = await this.examRepo.findExamById(id);
 
