@@ -1,17 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { Plus, Search } from 'lucide-react'
 import { initialExamAssignments, initialExams, initialClasses, initialCourses, initialResults, CURRENT_TEACHER_ID } from '@/lib/data'
 import { ExamCard } from './_components/ExamCard'
+import { fetchMyExams, isApiConfigured, type TeacherExam } from '@/lib/api/teacher-exams'
 
 type FilterTab = 'all' | 'scheduled' | 'active' | 'closed'
 
 export function ExamListClient() {
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [apiExams, setApiExams] = useState<TeacherExam[] | null>(null)
+
+  useEffect(() => {
+    if (!isApiConfigured()) return
+    fetchMyExams().then(setApiExams).catch(() => null)
+  }, [])
 
   const teacherAssignments = (initialExamAssignments ?? []).filter(ea => ea.assignedBy === CURRENT_TEACHER_ID)
 
@@ -107,31 +114,64 @@ export function ExamListClient() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredAssignments.map(assignment => {
-          const exam = getExam(assignment.examId)
-          const cls = getClass(assignment.classId)
-          const course = getCourse(assignment.classId)
-          const stats = assignment.status === 'closed' ? getExamStats(assignment.id) : null
-          if (!exam || !cls) return null
-          return (
-            <ExamCard
-              key={assignment.id}
-              assignment={assignment}
-              exam={exam}
-              cls={cls}
-              course={course}
-              stats={stats}
-              formatDate={formatDate}
-            />
-          )
-        })}
-      </div>
-
-      {filteredAssignments.length === 0 && (
-        <div className="text-center py-12" style={{ color: '#5A6474' }}>
-          {searchQuery ? 'Хайлтанд тохирох шалгалт олдсонгүй.' : 'Шалгалт бүртгэгдээгүй байна.'}
-        </div>
+      {apiExams !== null ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {apiExams
+              .filter(exam => {
+                if (activeTab !== 'all' && exam.status !== activeTab) return false
+                if (!searchQuery) return true
+                return exam.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  exam.subject.toLowerCase().includes(searchQuery.toLowerCase())
+              })
+              .map(exam => (
+                <div key={exam.id} className="bg-white border rounded-[10px] p-4" style={{ borderColor: '#DDE1E7' }}>
+                  <div className="font-medium text-[15px] mb-1" style={{ color: '#1A1A2E' }}>{exam.title}</div>
+                  <div className="text-[13px] mb-2" style={{ color: '#5A6474' }}>{exam.subject}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] px-2 py-0.5 rounded-full" style={{ backgroundColor: '#EBF2FF', color: '#0066FF' }}>{exam.status}</span>
+                    <span className="text-[12px]" style={{ color: '#8A94A0' }}>{exam.durationMinutes} мин</span>
+                  </div>
+                  {exam.startsAt && (
+                    <div className="text-[12px] mt-2" style={{ color: '#8A94A0' }}>{formatDate(exam.startsAt)}</div>
+                  )}
+                </div>
+              ))}
+          </div>
+          {apiExams.length === 0 && (
+            <div className="text-center py-12" style={{ color: '#5A6474' }}>
+              Шалгалт бүртгэгдээгүй байна.
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredAssignments.map(assignment => {
+              const exam = getExam(assignment.examId)
+              const cls = getClass(assignment.classId)
+              const course = getCourse(assignment.classId)
+              const stats = assignment.status === 'closed' ? getExamStats(assignment.id) : null
+              if (!exam || !cls) return null
+              return (
+                <ExamCard
+                  key={assignment.id}
+                  assignment={assignment}
+                  exam={exam}
+                  cls={cls}
+                  course={course}
+                  stats={stats}
+                  formatDate={formatDate}
+                />
+              )
+            })}
+          </div>
+          {filteredAssignments.length === 0 && (
+            <div className="text-center py-12" style={{ color: '#5A6474' }}>
+              {searchQuery ? 'Хайлтанд тохирох шалгалт олдсонгүй.' : 'Шалгалт бүртгэгдээгүй байна.'}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
