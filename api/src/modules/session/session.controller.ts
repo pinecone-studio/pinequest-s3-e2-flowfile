@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { SessionService } from './session.service';
 import { StartSessionDto } from './dto/start-session.dto';
+import { GradeSessionDto } from './dto/grade-session.dto';
 import { ClerkAuthGuard } from 'src/modules/auth/guards/clerk-auth.guard';
 import { RolesGuard } from 'src/modules/auth/guards/roles.guard';
 import { Roles } from 'src/modules/auth/decorators/roles.decorator';
@@ -101,5 +102,15 @@ export class SessionController {
   @Roles('teacher')
   flagSession(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.sessionService.flagSession(id, user);
+  }
+
+  @Patch(':id/grade')
+  @Roles('teacher')
+  gradeSession(
+    @Param('id') id: string,
+    @Body() body: GradeSessionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.sessionService.gradeSession(id, body.score, user);
   }
 }

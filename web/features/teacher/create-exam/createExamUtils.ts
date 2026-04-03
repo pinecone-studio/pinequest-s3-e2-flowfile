@@ -1,7 +1,9 @@
-import type { Course, Question, Exam, QuestionType } from '@/lib/types'
+import type { Course, Question, Exam, QuestionType, SchoolClass } from '@/lib/types'
 import { SUBJECT_NAMES } from '@/lib/constants'
 import { CURRENT_TEACHER_ID, save } from '@/lib/data'
+import { createExam, createQuestion, isApiConfigured } from '@/lib/api/teacher-exams'
 import { buildExamAssignmentNotifications, saveNotifications } from '@/lib/notifications'
+import { serializeQuestionForApi } from '@/lib/exam-question-meta'
 export type ImportedQuestionPayload = {
   question?: string; type?: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay'
   options?: string[]; correctAnswer?: string | string[]; points?: number
@@ -68,12 +70,22 @@ export function getCourseLabel(course: Course) {
   return `${SUBJECT_NAMES[course.subjectId] ?? course.subjectId} • ${course.grade}-р анги`
 }
 
+function getImportedQuestionPoints(type: QuestionType, rawPoints?: number) {
+  const parsedPoints = Number(rawPoints)
+
+  if (Number.isFinite(parsedPoints) && parsedPoints > 0) {
+    return Math.min(2, Math.max(1, Math.round(parsedPoints)))
+  }
+
+  return type === 'single' || type === 'truefalse' ? 1 : 2
+}
+
 export function mapImportedQuestions(items: ImportedQuestionPayload[], existingCount: number): Question[] {
   const baseId = Date.now()
   return items.reduce<Question[]>((acc, item, index) => {
     const text = item.question?.trim(); if (!text) return acc
     const type: QuestionType = item.type === 'multiple_choice' ? 'single' : item.type === 'true_false' ? 'truefalse' : item.type === 'essay' ? 'long' : 'short'
-    const q: Question = { id: `import-q-${baseId}-${index}`, examId: '', text, type, points: Math.max(1, Number(item.points) || 10), order: existingCount + acc.length + 1, isManualGrade: isManualQuestionType(type) }
+    const q: Question = { id: `import-q-${baseId}-${index}`, examId: '', text, type, points: getImportedQuestionPoints(type, item.points), order: existingCount + acc.length + 1, isManualGrade: isManualQuestionType(type) }
     if (type === 'single') { q.options = Array.isArray(item.options) ? item.options.map(o => o.trim()).filter(Boolean) : []; q.correctAnswer = typeof item.correctAnswer === 'string' ? item.correctAnswer.trim() : '' }
     else if (type === 'truefalse') { q.correctAnswer = (typeof item.correctAnswer === 'string' ? item.correctAnswer.trim().toLowerCase() : '') === 'false' ? 'false' : 'true' }
     else if (typeof item.correctAnswer === 'string' && item.correctAnswer.trim()) { q.correctAnswer = item.correctAnswer.trim() }
@@ -136,7 +148,7 @@ export async function saveExamPayload(params: {
   questions: Question[]; title: string; selectedCourse: Course; chapter: string; topic: string
   description: string; duration: number; totalPoints: number; visibility: 'private' | 'school'
   selectedClasses: string[]; startDate: string; startTime: string; endDate: string; endTime: string
-  classes: { id: string; name: string; studentIds: string[] }[]
+  classes: SchoolClass[]
 }) {
   const { questions, title, selectedCourse, chapter, topic, description, duration, totalPoints, visibility, selectedClasses, startDate, startTime, endDate, endTime, classes } = params
 
@@ -156,20 +168,16 @@ export async function saveExamPayload(params: {
         endsAt,
       })
       for (const [i, q] of questions.entries()) {
-        const inputType = q.type === 'single' || q.type === 'multiple' ? 'mcq' :
-          q.type === 'short' || q.type === 'truefalse' ? 'short_text' :
-          q.type === 'long' ? 'rich_text' :
-          q.type === 'formula' ? 'math_formula' :
-          q.type === 'chemistry' ? 'chem_formula' :
-          q.type === 'voice' ? 'voice_record' : 'rich_text'
+        const serializedQuestion = serializeQuestionForApi(q)
         await createQuestion(result.id, {
           content: q.text,
-          inputType,
+          inputType: serializedQuestion.inputType,
           points: q.points,
           orderIndex: i + 1,
           isRequired: true,
-          optionsJson: q.options ? JSON.stringify(q.options) : undefined,
-          correctAnswer: typeof q.correctAnswer === 'string' ? q.correctAnswer : undefined,
+          subjectHint: serializedQuestion.subjectHint,
+          optionsJson: serializedQuestion.optionsJson,
+          correctAnswer: serializedQuestion.correctAnswer,
         })
       }
       return result
@@ -190,4 +198,6 @@ export async function saveExamPayload(params: {
       selectedClasses: classes.filter((schoolClass) => selectedClasses.includes(schoolClass.id)),
     }))
   }
+
+  return exam
 }

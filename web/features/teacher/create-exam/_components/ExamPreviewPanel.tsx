@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowLeft, GripVertical, Trash2, Clock, FileText, Check, Eye, Save } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, Clock, FileText, Check, Eye, Save } from 'lucide-react'
 import type { Question } from '@/lib/types'
 
 type SubjectColor = { bg: string; text?: string }
@@ -12,6 +12,7 @@ export function ExamPreviewPanel({
   questions,
   totalPoints,
   onRemoveQuestion,
+  onSelectQuestion,
   onSave,
 }: {
   title: string
@@ -21,6 +22,7 @@ export function ExamPreviewPanel({
   questions: Question[]
   totalPoints: number
   onRemoveQuestion: (index: number) => void
+  onSelectQuestion: (index: number) => void
   onSave: () => void
 }) {
   return (
@@ -52,12 +54,12 @@ export function ExamPreviewPanel({
               {questions.length > 0 ? (
                 <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
                   {questions.map((q, index) => (
-                    <div key={q.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-table-header group cursor-pointer">
+                    <div key={q.id} onClick={() => onSelectQuestion(index)} className="flex items-center gap-2 p-2 rounded-md border border-transparent hover:bg-table-header hover:border-card-border group cursor-pointer transition-colors">
                       <span className="w-5 h-5 rounded-full text-white text-[10px] font-medium flex items-center justify-center shrink-0" style={{ backgroundColor: subjectColor.bg }}>{index + 1}</span>
                       <span className="text-[12px] text-foreground truncate flex-1">{q.text}</span>
                       <span className="px-1.5 py-0.5 bg-table-header text-text-secondary text-[10px] rounded shrink-0">{q.points} оноо</span>
-                      <GripVertical size={12} className="text-input-border shrink-0 opacity-0 group-hover:opacity-100" strokeWidth={1.5} />
-                      <button onClick={() => onRemoveQuestion(index)} className="p-0.5 text-text-secondary hover:text-red-accent opacity-0 group-hover:opacity-100"><Trash2 size={12} strokeWidth={1.5} /></button>
+                      <Pencil size={12} className="text-input-border shrink-0 opacity-0 group-hover:opacity-100" strokeWidth={1.5} />
+                      <button type="button" onClick={(event) => { event.stopPropagation(); onRemoveQuestion(index) }} className="p-0.5 text-text-secondary hover:text-red-accent opacity-0 group-hover:opacity-100"><Trash2 size={12} strokeWidth={1.5} /></button>
                     </div>
                   ))}
                 </div>

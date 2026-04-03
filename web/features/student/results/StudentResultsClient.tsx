@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Trophy, CheckCircle, Clock } from 'lucide-react'
 import { getAll } from '@/lib/data'
+import { formatMongolianShortDate } from '@/lib/date-time'
 import type { Exam, Result, Question, Attempt } from '@/lib/types'
 import { initialExams, initialResults, initialQuestions, initialAttempts, CURRENT_STUDENT_ID } from '@/lib/data'
 import { ResultExamList } from './_components/ResultExamList'
@@ -55,7 +56,7 @@ export function StudentResultsClient() {
       : null
   const getExam = (examId: string) => exams.find(e => e.id === examId)
   const getExamQuestions = (exam: Exam) => questions.filter(q => exam.questionIds.includes(q.id))
-  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('mn-MN', { year: 'numeric', month: 'short', day: 'numeric' })
+  const formatDate = (dateStr: string) => formatMongolianShortDate(dateStr)
   const publishedResults = studentResults.filter(r => r.isPublished)
   const avgScore = publishedResults.length > 0 ? Math.round(publishedResults.reduce((sum, r) => sum + (r.totalScore / r.maxScore) * 100, 0) / publishedResults.length) : 0
 

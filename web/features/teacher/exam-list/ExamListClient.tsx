@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Radio, Search } from 'lucide-react'
 import { initialExamAssignments, initialExams, initialClasses, initialCourses, initialResults, CURRENT_TEACHER_ID } from '@/lib/data'
 import { ExamCard } from './_components/ExamCard'
 import { fetchMyExams, isApiConfigured, type TeacherExam } from '@/lib/api/teacher-exams'
@@ -71,15 +71,24 @@ export function ExamListClient() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-[22px] font-semibold" style={{ color: '#1A1A2E' }}>Авсан шалгалтууд</h1>
-        <Link
-          href="/teacher/exams/create"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-[14px] font-medium text-white transition-colors"
-          style={{ backgroundColor: '#0066FF' }}
-          onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#0052CC' }}
-          onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#0066FF' }}
-        >
-          <Plus size={16} strokeWidth={2} />Шалгалт үүсгэх
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/teacher/quizzes"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-[14px] font-medium border transition-colors"
+            style={{ borderColor: '#DDE1E7', color: '#1A1A2E' }}
+          >
+            <Radio size={16} strokeWidth={2} />Шуурхай quiz
+          </Link>
+          <Link
+            href="/teacher/exams/create"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-[14px] font-medium text-white transition-colors"
+            style={{ backgroundColor: '#0066FF' }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#0052CC' }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#0066FF' }}
+          >
+            <Plus size={16} strokeWidth={2} />Шалгалт үүсгэх
+          </Link>
+        </div>
       </div>
 
       <div className="flex items-center gap-4 mb-6">

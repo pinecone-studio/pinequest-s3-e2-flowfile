@@ -12,7 +12,7 @@ export const examSessions = pgTable('exam_sessions', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   status: text('status', {
-    enum: ['not_started', 'in_progress', 'submitted', 'force_submitted'],
+    enum: ['not_started', 'in_progress', 'submitted', 'force_submitted', 'graded'],
   })
     .notNull()
     .default('not_started'),

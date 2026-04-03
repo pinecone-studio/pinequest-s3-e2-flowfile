@@ -1,18 +1,10 @@
 import type { Metadata, Viewport } from 'next'
-import { Montserrat } from 'next/font/google'
-import 'ketcher-react/dist/index.css'
 import 'mathlive/fonts.css'
 import './globals.css'
 import { DataInitializer } from '@/components/data-initializer'
 import { PwaProvider } from '@/components/pwa-provider'
 import { PlatformSwitcher } from '@/components/platform-switcher'
 import { Toaster } from '@/components/ui/toaster'
-
-const montserrat = Montserrat({ 
-  subsets: ['latin', 'cyrillic'],
-  weight: ['400', '500', '600'],
-  variable: '--font-montserrat',
-})
 
 export const metadata: Metadata = {
   title: 'e-Shalgalt | Үндэсний шалгалтын систем',
@@ -32,7 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="mn">
-      <body className={`${montserrat.variable} font-sans antialiased`}>
+      <body className="font-sans antialiased">
         <PwaProvider />
         <DataInitializer />
         <div className="min-h-screen flex flex-col">

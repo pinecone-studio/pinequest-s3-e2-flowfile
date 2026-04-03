@@ -218,6 +218,10 @@ export class ExamService {
       return 'force_submitted';
     }
 
+    if (session?.status === 'graded') {
+      return 'submitted';
+    }
+
     if (session?.status === 'in_progress') {
       return 'in_progress';
     }
