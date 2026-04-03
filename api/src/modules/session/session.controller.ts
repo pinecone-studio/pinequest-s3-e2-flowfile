@@ -29,6 +29,24 @@ export class SessionController {
     return this.sessionService.getSessionsByExam(examId, user);
   }
 
+  @Get('exam/:examId/live')
+  @Roles('teacher')
+  getLiveSessions(
+    @Param('examId') examId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.sessionService.getSessionsByExam(examId, user);
+  }
+
+  @Get('exam/:examId/analytics')
+  @Roles('teacher')
+  getExamAnalytics(
+    @Param('examId') examId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.sessionService.getExamAnalytics(examId, user);
+  }
+
   @Get('student/:studentId/exam/:examId')
   @Roles('teacher', 'student')
   getSessionByStudentAndExam(
