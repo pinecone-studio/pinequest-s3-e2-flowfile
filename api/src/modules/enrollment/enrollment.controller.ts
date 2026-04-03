@@ -8,7 +8,9 @@ export class EnrollmentController {
 
   @Post()
   enrollStudent(@Body() body: CreateEnrollmentDto) {
-    return this.enrollmentService.enrollStudent(body.examId, body.studentId);
+    return this.enrollmentService.enrollStudent(body.examId, body.studentId, {
+      studentName: body.studentName,
+    });
   }
 
   @Get('exam/:examId')

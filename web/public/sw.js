@@ -50,7 +50,12 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(async () => {
           const cached = await caches.match(request)
-          return cached || caches.match('/student') || caches.match('/')
+          return (
+            cached ||
+            (await caches.match('/student')) ||
+            (await caches.match('/')) ||
+            Response.error()
+          )
         }),
     )
     return
@@ -73,7 +78,7 @@ self.addEventListener('fetch', (event) => {
             caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)).catch(() => undefined)
             return response
           })
-          .catch(() => undefined)
+          .catch(() => Response.error())
       }
 
       return fetch(request)
@@ -82,7 +87,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)).catch(() => undefined)
           return response
         })
-        .catch(() => cached)
+        .catch(() => cached || Response.error())
     }),
   )
 })

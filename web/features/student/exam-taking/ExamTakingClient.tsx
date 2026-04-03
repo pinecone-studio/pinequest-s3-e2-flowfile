@@ -1,9 +1,11 @@
 'use client'
 
 import { use, useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { runPreviewCode } from '@/lib/api/student-exams'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { joinQrExam, runPreviewCode } from '@/lib/api/student-exams'
+import { isApiConfigured } from '@/lib/api/client'
 import { SUBJECT_COLORS } from '@/lib/constants'
+import { registerQrStudentProfile, readQrStudentProfile, type QrStudentProfile } from '@/lib/student-identity'
 import { ExamTopBar } from './_components/ExamTopBar'
 import { QuestionGrid } from './_components/QuestionGrid'
 import { QuestionDisplay } from './_components/QuestionDisplay'
@@ -21,16 +23,26 @@ import { SubmitModal } from './_components/SubmitModal'
 import { ExamLoadingState } from './_components/ExamLoadingState'
 import { ExamNotFoundState } from './_components/ExamNotFoundState'
 import { ExamCompletedState } from './_components/ExamCompletedState'
+import { StudentQrEntryGate } from './_components/StudentQrEntryGate'
+import { createLocalNotification } from '@/lib/notifications'
 import { scoreAndSave } from './examScoring'
 import { useExamSession } from './useExamSession'
 import { cacheExamAttempt, queueOfflineDraft } from '@/lib/pwa/offline-exam'
 
-const globalNavHeightClass = 'top-9'
-
 export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const session = useExamSession(id)
+  const searchParams = useSearchParams()
+  const isQrEntry = searchParams.get('entry') === 'qr'
+  const [qrProfile, setQrProfile] = useState<QrStudentProfile | null>(() =>
+    isQrEntry ? readQrStudentProfile(id) : null,
+  )
+  const [isQrReady, setIsQrReady] = useState(!isQrEntry)
+  const [isPreparingQrEntry, setIsPreparingQrEntry] = useState(false)
+  const session = useExamSession(id, {
+    enabled: isQrReady,
+    qrClassName: qrProfile?.className ?? null,
+  })
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -40,6 +52,17 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
   const [codeErrors, setCodeErrors] = useState<Record<string, string | null>>({})
   const hasAutoSubmittedRef = useRef(false)
   const lastOfflinePersistRef = useRef<{ signature: string; at: number } | null>(null)
+
+  useEffect(() => {
+    if (!isQrEntry) {
+      setQrProfile(null)
+      setIsQrReady(true)
+      return
+    }
+
+    setQrProfile(readQrStudentProfile(id))
+    setIsQrReady(false)
+  }, [id, isQrEntry])
 
   useEffect(() => {
     if (currentIndex >= session.questions.length) {
@@ -65,10 +88,11 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
 
     const now = Date.now()
     const lastPersist = lastOfflinePersistRef.current
+    const hasMeaningfulChanges = lastPersist?.signature !== signature
     const shouldRefreshTimerSnapshot =
       !lastPersist || now - lastPersist.at >= 15000 || session.timeRemaining <= 0
 
-    if (lastPersist?.signature === signature && !shouldRefreshTimerSnapshot) {
+    if (!hasMeaningfulChanges && !shouldRefreshTimerSnapshot) {
       return
     }
 
@@ -139,6 +163,17 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
         timeRemaining: session.timeRemaining,
         currentStudentId: session.currentStudentId,
       })
+
+      if (session.exam.teacherId) {
+        createLocalNotification({
+          recipientId: session.exam.teacherId,
+          examId: session.exam.id,
+          title: 'Exam submitted',
+          body: `${session.currentStudentName} "${session.exam.title}" шалгалтыг дуусгаад илгээлээ.`,
+          type: 'exam_submitted',
+        })
+      }
+
       router.push(`/student/results?examId=${session.exam.id}&view=latest`)
     } finally {
       setIsSubmitting(false)
@@ -157,13 +192,18 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
   ])
 
   useEffect(() => {
-    if (!session.isLoaded || !session.exam || session.timeRemaining <= 0) {
+    if (!session.isLoaded || !session.exam) {
       return
     }
 
     const timer = window.setInterval(() => {
       session.setTimeRemaining((prev) => {
-        if (prev <= 1) {
+        if (prev <= 0) {
+          window.clearInterval(timer)
+          return 0
+        }
+
+        if (prev === 1) {
           window.clearInterval(timer)
           if (!hasAutoSubmittedRef.current) {
             hasAutoSubmittedRef.current = true
@@ -177,7 +217,37 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
     }, 1000)
 
     return () => window.clearInterval(timer)
-  }, [handleSubmit, session.exam, session.isLoaded, session.timeRemaining])
+  }, [handleSubmit, session.exam, session.isLoaded, session.setTimeRemaining])
+
+  const handleQrEntrySubmit = useCallback(
+    async (payload: { name: string; className: string }) => {
+      if (isPreparingQrEntry) {
+        return
+      }
+
+      setIsPreparingQrEntry(true)
+
+      try {
+        const profile = registerQrStudentProfile({
+          examId: id,
+          name: payload.name,
+          className: payload.className,
+        })
+
+        if (isApiConfigured()) {
+          await joinQrExam(id, profile.studentId, {
+            studentName: profile.name,
+          })
+        }
+
+        setQrProfile(profile)
+        setIsQrReady(true)
+      } finally {
+        setIsPreparingQrEntry(false)
+      }
+    },
+    [id, isPreparingQrEntry],
+  )
 
   const toggleMarkForReview = () => {
     const currentQuestion = session.questions[currentIndex]
@@ -204,6 +274,17 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
   const subjectKey = session.subject?.id || session.exam?.subjectId || 'math'
   const subjectColor =
     SUBJECT_COLORS[subjectKey as keyof typeof SUBJECT_COLORS] || SUBJECT_COLORS.math
+
+  if (isQrEntry && !isQrReady) {
+    return (
+      <StudentQrEntryGate
+        defaultName={qrProfile?.name ?? ''}
+        defaultClassName={qrProfile?.className ?? ''}
+        isSubmitting={isPreparingQrEntry}
+        onSubmit={handleQrEntrySubmit}
+      />
+    )
+  }
 
   if (!session.isLoaded) {
     return <ExamLoadingState />
@@ -254,166 +335,187 @@ export function ExamTakingClient({ params }: { params: Promise<{ id: string }> }
   }
 
   return (
-    <div className={`fixed inset-x-0 bottom-0 ${globalNavHeightClass} flex flex-col bg-page-bg`}>
-      <ExamTopBar
-        examTitle={session.exam.title}
-        subjectColor={subjectColor}
-        subjectName={session.subject?.name || 'Шалгалт'}
-        subjectInitial={session.subject?.name.charAt(0) || 'Ш'}
-        timeRemaining={session.timeRemaining}
-        formattedTime={session.formatTime(session.timeRemaining)}
-        currentIndex={currentIndex}
-        totalQuestions={session.questions.length}
-        onSubmitClick={() => setShowSubmitModal(true)}
-      />
+    <div className="min-h-screen bg-page-bg">
+      <div className="flex min-h-dvh flex-col">
+        <div
+          className="sticky z-30 bg-page-bg/95 backdrop-blur-sm"
+          style={{ top: 'var(--platform-switcher-height)' }}
+        >
+          <ExamTopBar
+            examTitle={session.exam.title}
+            subjectColor={subjectColor}
+            subjectName={session.subject?.name || 'Шалгалт'}
+            subjectInitial={session.subject?.name.charAt(0) || 'Ш'}
+            timeRemaining={session.timeRemaining}
+            formattedTime={session.formatTime(session.timeRemaining)}
+            currentIndex={currentIndex}
+            totalQuestions={session.questions.length}
+            onSubmitClick={() => setShowSubmitModal(true)}
+          />
+        </div>
 
-      <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
-        <QuestionGrid
-          questions={session.questions}
-          answers={session.answers}
-          markedForReview={session.markedForReview}
-          currentIndex={currentIndex}
-          onSelect={setCurrentIndex}
-          answeredCount={answeredCount}
-          unansweredCount={unansweredCount}
-          markedCount={markedCount}
-        />
-
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl px-4 py-6 md:px-6 md:py-8">
-            <QuestionDisplay
-              question={currentQuestion}
+        <div className="flex flex-1 flex-col md:flex-row">
+          <div className="hidden md:block">
+            <QuestionGrid
+              questions={session.questions}
+              answers={session.answers}
+              markedForReview={session.markedForReview}
               currentIndex={currentIndex}
-              subjectColor={subjectColor}
+              onSelect={setCurrentIndex}
+              answeredCount={answeredCount}
+              unansweredCount={unansweredCount}
+              markedCount={markedCount}
             />
+          </div>
 
-            <div className="space-y-3">
-              {currentQuestion.type === 'single' && currentQuestion.options && (
-                <AnswerMCQ
-                  options={currentQuestion.options}
-                  selected={currentAnswer}
-                  isMultiple={false}
-                  onChange={(value) =>
-                    session.setAnswerValue(currentQuestion, String(value))
-                  }
-                />
-              )}
+          <div className="min-h-0 flex-1">
+            <div className="mx-auto max-w-3xl px-4 py-5 pb-28 md:px-6 md:py-8 md:pb-10">
+              <div className="mb-4 flex flex-wrap items-center gap-2 md:hidden">
+                <span className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-text-secondary shadow-sm">
+                  Хариулсан {answeredCount}
+                </span>
+                <span className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-text-secondary shadow-sm">
+                  Үлдсэн {unansweredCount}
+                </span>
+                <span className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-text-secondary shadow-sm">
+                  Тэмдэглэсэн {markedCount}
+                </span>
+              </div>
 
-              {currentQuestion.type === 'multiple' && currentQuestion.options && (
-                <AnswerMCQ
-                  options={currentQuestion.options}
-                  selected={currentAnswer ? JSON.parse(currentAnswer) : []}
-                  isMultiple
-                  onChange={(value) =>
-                    session.setAnswerValue(
-                      currentQuestion,
-                      JSON.stringify(Array.isArray(value) ? value : [value]),
-                    )
-                  }
-                />
-              )}
+              <QuestionDisplay
+                question={currentQuestion}
+                currentIndex={currentIndex}
+                subjectColor={subjectColor}
+              />
 
-              {currentQuestion.type === 'truefalse' && (
-                <AnswerTrueFalse
-                  selected={currentAnswer}
-                  onChange={(value) => session.setAnswerValue(currentQuestion, value)}
-                />
-              )}
+              <div className="space-y-3">
+                {currentQuestion.type === 'single' && currentQuestion.options && (
+                  <AnswerMCQ
+                    options={currentQuestion.options}
+                    selected={currentAnswer}
+                    isMultiple={false}
+                    onChange={(value) =>
+                      session.setAnswerValue(currentQuestion, String(value))
+                    }
+                  />
+                )}
 
-              {(currentQuestion.type === 'short' || currentQuestion.type === 'long') && (
-                <AnswerText
-                  value={currentAnswer}
-                  onChange={(value) => session.setAnswerValue(currentQuestion, value)}
-                  rows={currentQuestion.type === 'short' ? 3 : 8}
-                />
-              )}
+                {currentQuestion.type === 'multiple' && currentQuestion.options && (
+                  <AnswerMCQ
+                    options={currentQuestion.options}
+                    selected={currentAnswer ? JSON.parse(currentAnswer) : []}
+                    isMultiple
+                    onChange={(value) =>
+                      session.setAnswerValue(
+                        currentQuestion,
+                        JSON.stringify(Array.isArray(value) ? value : [value]),
+                      )
+                    }
+                  />
+                )}
 
-              {currentQuestion.type === 'formula' && (
-                <AnswerFormula
-                  value={currentAnswer}
-                  onChange={(value) => session.setAnswerValue(currentQuestion, value)}
-                />
-              )}
+                {currentQuestion.type === 'truefalse' && (
+                  <AnswerTrueFalse
+                    selected={currentAnswer}
+                    onChange={(value) => session.setAnswerValue(currentQuestion, value)}
+                  />
+                )}
 
-              {currentQuestion.type === 'chemistry' && (
-                <AnswerChemistry
-                  value={currentAnswer}
-                  onChange={(value) => session.setAnswerValue(currentQuestion, value)}
-                />
-              )}
+                {(currentQuestion.type === 'short' || currentQuestion.type === 'long') && (
+                  <AnswerText
+                    value={currentAnswer}
+                    onChange={(value) => session.setAnswerValue(currentQuestion, value)}
+                    rows={currentQuestion.type === 'short' ? 3 : 8}
+                  />
+                )}
 
-              {currentQuestion.type === 'code' && (
-                <AnswerCode
-                  value={currentAnswer}
-                  onChange={(value) => session.setAnswerValue(currentQuestion, value)}
-                  onRun={handleRunCode}
-                  isRunning={isRunningCode}
-                  logs={codeLogs[currentQuestion.id] ?? []}
-                  result={codeResults[currentQuestion.id] ?? null}
-                  error={codeErrors[currentQuestion.id] ?? null}
-                />
-              )}
+                {currentQuestion.type === 'formula' && (
+                  <AnswerFormula
+                    value={currentAnswer}
+                    onChange={(value) => session.setAnswerValue(currentQuestion, value)}
+                  />
+                )}
 
-              {currentQuestion.type === 'voice' && (
-                <AnswerMediaRecorder
-                  mode="audio"
-                  value={currentAnswer}
-                  onChange={(value) => session.setAnswerValue(currentQuestion, value)}
-                />
-              )}
+                {currentQuestion.type === 'chemistry' && (
+                  <AnswerChemistry
+                    value={currentAnswer}
+                    onChange={(value) => session.setAnswerValue(currentQuestion, value)}
+                  />
+                )}
 
-              {(currentQuestion.type === 'video' ||
-                currentQuestion.type === 'handwritten') && (
-                <AnswerMediaRecorder
-                  mode="video"
-                  value={currentAnswer}
-                  onChange={(value) => session.setAnswerValue(currentQuestion, value)}
-                />
-              )}
+                {currentQuestion.type === 'code' && (
+                  <AnswerCode
+                    value={currentAnswer}
+                    onChange={(value) => session.setAnswerValue(currentQuestion, value)}
+                    onRun={handleRunCode}
+                    isRunning={isRunningCode}
+                    logs={codeLogs[currentQuestion.id] ?? []}
+                    result={codeResults[currentQuestion.id] ?? null}
+                    error={codeErrors[currentQuestion.id] ?? null}
+                  />
+                )}
 
-              {currentQuestion.type === 'matching' && (
-                <AnswerMatching
-                  pairs={currentQuestion.matchingPairs ?? []}
-                  selected={currentAnswer ? JSON.parse(currentAnswer) : []}
-                  onChange={(value) =>
-                    session.setAnswerValue(currentQuestion, JSON.stringify(value))
-                  }
-                />
+                {currentQuestion.type === 'voice' && (
+                  <AnswerMediaRecorder
+                    mode="audio"
+                    value={currentAnswer}
+                    onChange={(value) => session.setAnswerValue(currentQuestion, value)}
+                  />
+                )}
+
+                {(currentQuestion.type === 'video' ||
+                  currentQuestion.type === 'handwritten') && (
+                  <AnswerMediaRecorder
+                    mode="video"
+                    value={currentAnswer}
+                    onChange={(value) => session.setAnswerValue(currentQuestion, value)}
+                  />
+                )}
+
+                {currentQuestion.type === 'matching' && (
+                  <AnswerMatching
+                    pairs={currentQuestion.matchingPairs ?? []}
+                    selected={currentAnswer ? JSON.parse(currentAnswer) : []}
+                    onChange={(value) =>
+                      session.setAnswerValue(currentQuestion, JSON.stringify(value))
+                    }
+                  />
+                )}
+              </div>
+
+              {session.lastSaved && (
+                <div className="mt-4 flex items-center gap-1.5 text-[12px] text-text-secondary">
+                  <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                  Автоматаар хадгалагдсан{' '}
+                  {session.lastSaved.toLocaleTimeString('mn-MN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </div>
               )}
             </div>
-
-            {session.lastSaved && (
-              <div className="mt-4 flex items-center gap-1.5 text-[12px] text-text-secondary">
-                <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                Автоматаар хадгалагдсан{' '}
-                {session.lastSaved.toLocaleTimeString('mn-MN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </div>
-            )}
           </div>
         </div>
-      </div>
 
-      <ExamBottomBar
-        currentIndex={currentIndex}
-        total={session.questions.length}
-        isMarked={session.markedForReview.has(currentQuestion?.id || '')}
-        lastSaved={session.lastSaved}
-        onPrev={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
-        onNext={() =>
-          setCurrentIndex((prev) =>
-            Math.min(session.questions.length - 1, prev + 1),
-          )
-        }
-        onToggleMark={toggleMarkForReview}
-        proctoringPreview={
-          <StudentProctoringPreview
-            onProctoringViolation={session.reportProctoringViolation}
-          />
-        }
-      />
+        <ExamBottomBar
+          currentIndex={currentIndex}
+          total={session.questions.length}
+          isMarked={session.markedForReview.has(currentQuestion?.id || '')}
+          lastSaved={session.lastSaved}
+          onPrev={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
+          onNext={() =>
+            setCurrentIndex((prev) =>
+              Math.min(session.questions.length - 1, prev + 1),
+            )
+          }
+          onToggleMark={toggleMarkForReview}
+          proctoringPreview={
+            <StudentProctoringPreview
+              onProctoringViolation={session.reportProctoringViolation}
+            />
+          }
+        />
+      </div>
 
       {showSubmitModal && (
         <SubmitModal

@@ -3,6 +3,8 @@
 import { apiFetch, isApiConfigured } from '@/lib/api/client'
 import type { AppNotification } from '@/lib/types'
 
+type NotificationApiRole = 'student' | 'teacher'
+
 type ApiNotificationType =
   | 'exam_started'
   | 'exam_submitted'
@@ -42,28 +44,71 @@ function mapApiNotification(notification: ApiNotification): AppNotification {
   }
 }
 
-export async function fetchMyNotifications() {
+async function fetchNotificationsForRole(role: NotificationApiRole) {
   const notifications = await apiFetch<ApiNotification[]>(
     '/notifications/me',
     undefined,
-    'student',
+    role,
   )
 
   return notifications.map(mapApiNotification)
 }
 
-export async function markMyNotificationAsRead(notificationId: string) {
+async function markNotificationAsReadForRole(
+  notificationId: string,
+  role: NotificationApiRole,
+) {
   const notification = await apiFetch<ApiNotification>(
     `/notifications/${notificationId}/read`,
     { method: 'PATCH' },
-    'student',
+    role,
   )
 
   return mapApiNotification(notification)
 }
 
+async function markAllNotificationsAsReadForRole(role: NotificationApiRole) {
+  return apiFetch<void>('/notifications/me/read-all', { method: 'PATCH' }, role)
+}
+
+async function fetchUnreadNotificationCountForRole(role: NotificationApiRole) {
+  return apiFetch<{ userId: string; unreadCount: number }>(
+    '/notifications/me/unread-count',
+    undefined,
+    role,
+  )
+}
+
+export async function fetchMyNotifications() {
+  return fetchNotificationsForRole('student')
+}
+
+export async function fetchTeacherNotifications() {
+  return fetchNotificationsForRole('teacher')
+}
+
+export async function markMyNotificationAsRead(notificationId: string) {
+  return markNotificationAsReadForRole(notificationId, 'student')
+}
+
+export async function markTeacherNotificationAsRead(notificationId: string) {
+  return markNotificationAsReadForRole(notificationId, 'teacher')
+}
+
 export async function markAllMyNotificationsAsRead() {
-  return apiFetch<void>('/notifications/me/read-all', { method: 'PATCH' }, 'student')
+  return markAllNotificationsAsReadForRole('student')
+}
+
+export async function markAllTeacherNotificationsAsRead() {
+  return markAllNotificationsAsReadForRole('teacher')
+}
+
+export async function fetchMyUnreadNotificationCount() {
+  return fetchUnreadNotificationCountForRole('student')
+}
+
+export async function fetchTeacherUnreadNotificationCount() {
+  return fetchUnreadNotificationCountForRole('teacher')
 }
 
 export { isApiConfigured }

@@ -19,17 +19,47 @@ export function QuestionResultRow({
 }: {
   question: Question
   index: number
-  score: number
+  score?: number
   userAnswer: string | string[] | undefined
 }) {
-  const isCorrect = score === question.points
-  const hasAnswer = userAnswer !== undefined && userAnswer !== ''
+  const hasDetailedScore = typeof score === 'number'
+  const hasAnswer =
+    userAnswer !== undefined &&
+    userAnswer !== '' &&
+    (!Array.isArray(userAnswer) || userAnswer.length > 0)
+  const isCorrect = hasDetailedScore && score === question.points
+  const isIncorrect = hasDetailedScore && !isCorrect && hasAnswer
+  const statusBg = isCorrect
+    ? 'bg-green-100'
+    : isIncorrect
+      ? 'bg-red-100'
+      : hasAnswer
+        ? 'bg-blue-100'
+        : 'bg-gray-100'
+  const statusColor = isCorrect
+    ? 'text-green-600'
+    : isIncorrect
+      ? 'text-red-500'
+      : hasAnswer
+        ? 'text-blue-600'
+        : 'text-gray-400'
 
   return (
     <div className="px-5 py-4 hover:bg-table-header transition-colors">
       <div className="flex items-start gap-4">
-        <div className={cn('w-8 h-8 rounded-full flex items-center justify-center shrink-0', isCorrect ? 'bg-green-100' : hasAnswer ? 'bg-red-100' : 'bg-gray-100')}>
-          {isCorrect ? <CheckCircle size={16} className="text-green-600" strokeWidth={2} /> : hasAnswer ? <XCircle size={16} className="text-red-500" strokeWidth={2} /> : <MinusCircle size={16} className="text-gray-400" strokeWidth={2} />}
+        <div
+          className={cn(
+            'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
+            statusBg,
+          )}
+        >
+          {isCorrect ? (
+            <CheckCircle size={16} className="text-green-600" strokeWidth={2} />
+          ) : isIncorrect ? (
+            <XCircle size={16} className="text-red-500" strokeWidth={2} />
+          ) : (
+            <MinusCircle size={16} className={statusColor} strokeWidth={2} />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -42,21 +72,52 @@ export function QuestionResultRow({
           <div className="flex items-center gap-6 text-[12px]">
             <div>
               <span className="text-text-secondary">Таны хариу: </span>
-              <span className={cn('font-medium', isCorrect ? 'text-green-600' : hasAnswer ? 'text-red-500' : 'text-gray-400')}>
+              <span
+                className={cn(
+                  'font-medium',
+                  isCorrect
+                    ? 'text-green-600'
+                    : isIncorrect
+                      ? 'text-red-500'
+                      : hasAnswer
+                        ? 'text-blue-600'
+                        : 'text-gray-400',
+                )}
+              >
                 {formatAnswer(userAnswer)}
               </span>
             </div>
-            {!isCorrect && question.correctAnswer && (
+            {hasDetailedScore && !isCorrect && question.correctAnswer && (
               <div>
                 <span className="text-text-secondary">Зөв хариу: </span>
-                <span className="font-medium text-green-600">{formatAnswer(question.correctAnswer as string | string[])}</span>
+                <span className="font-medium text-green-600">
+                  {formatAnswer(question.correctAnswer as string | string[])}
+                </span>
               </div>
             )}
           </div>
         </div>
         <div className="text-right shrink-0">
-          <div className={cn('text-[16px] font-bold', isCorrect ? 'text-green-600' : hasAnswer ? 'text-red-500' : 'text-gray-400')}>{score}</div>
-          <div className="text-[11px] text-text-secondary">/ {question.points}</div>
+          {hasDetailedScore ? (
+            <>
+              <div
+                className={cn(
+                  'text-[16px] font-bold',
+                  isCorrect ? 'text-green-600' : isIncorrect ? 'text-red-500' : 'text-gray-400',
+                )}
+              >
+                {score}
+              </div>
+              <div className="text-[11px] text-text-secondary">/ {question.points}</div>
+            </>
+          ) : (
+            <>
+              <div className={cn('text-[13px] font-semibold', hasAnswer ? 'text-blue-600' : 'text-gray-400')}>
+                {hasAnswer ? 'Илгээгдсэн' : 'Хоосон'}
+              </div>
+              <div className="text-[11px] text-text-secondary">дэлгэрэнгүйгүй</div>
+            </>
+          )}
         </div>
       </div>
     </div>

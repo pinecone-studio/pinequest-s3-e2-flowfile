@@ -23,7 +23,7 @@ export interface Course {
   id: string
   subjectId: string
   grade: number         // 1–12
-  year: string          // '2024–2025'
+  year: string          // '2025–2026'
   teacherId: string
   classIds: string[]
 }

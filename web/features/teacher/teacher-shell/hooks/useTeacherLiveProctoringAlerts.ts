@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { subscribeToTeacherProctoringStream } from '@/lib/api/teacher-proctoring'
 import { isApiConfigured } from '@/lib/api/client'
 import { useToast } from '@/components/ui/use-toast'
+import { emitTeacherNotificationRefresh } from '@/lib/notifications'
 
 function formatViolationDescription(params: {
   studentName: string
@@ -54,6 +55,7 @@ export function useTeacherLiveProctoringAlerts() {
           }),
           variant: event.violation.severity === 'high' ? 'destructive' : 'default',
         })
+        emitTeacherNotificationRefresh()
       },
     })
   }, [toast])

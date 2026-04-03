@@ -1,17 +1,28 @@
-import { Plus, Sparkles, Wand2 } from 'lucide-react'
+import { Copy, Plus, Sparkles, Wand2 } from 'lucide-react'
 import type { Question } from '@/lib/types'
 import { QUESTION_TYPE_LABELS } from '@/lib/types'
 
-export function QuestionTabAI({ aiTopic, aiDifficulty, aiCount, aiGenerating, aiGeneratedQuestions, onAiTopic, onAiDifficulty, onAiCount, onAiGenerate, onAddAiQuestions }: {
+export function QuestionTabAI({ aiTopic, aiDifficulty, aiCount, aiGenerating, aiGeneratedQuestions, onAiTopic, onAiDifficulty, onAiCount, onAiGenerate, onAddAiQuestions, onDemo }: {
   aiTopic: string; aiDifficulty: 'easy' | 'medium' | 'hard'; aiCount: number; aiGenerating: boolean; aiGeneratedQuestions: Question[]
   onAiTopic: (v: string) => void; onAiDifficulty: (v: 'easy' | 'medium' | 'hard') => void; onAiCount: (v: number) => void
   onAiGenerate: () => void; onAddAiQuestions: (ids: string[]) => void
+  onDemo: () => void
 }) {
   return (
     <div className="bg-white rounded-lg border border-card-border p-6">
-      <div className="flex items-center gap-3 mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-100">
-        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center"><Sparkles size={20} className="text-white" strokeWidth={1.5} /></div>
-        <div><h3 className="text-[15px] font-semibold text-foreground">AI Auto-fill</h3><p className="text-[13px] text-text-secondary">Хиймэл оюун ухаанаар асуулт автоматаар үүсгэнэ</p></div>
+      <div className="flex items-start justify-between gap-3 mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-100">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center"><Sparkles size={20} className="text-white" strokeWidth={1.5} /></div>
+          <div><h3 className="text-[15px] font-semibold text-foreground">AI Auto-fill</h3><p className="text-[13px] text-text-secondary">Хиймэл оюун ухаанаар асуулт автоматаар үүсгэнэ</p></div>
+        </div>
+        <button
+          type="button"
+          onClick={onDemo}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-white/70 bg-white/80 px-3 py-2 text-[12px] font-medium text-foreground transition-colors hover:bg-white"
+        >
+          <Copy size={13} strokeWidth={1.5} />
+          Demo
+        </button>
       </div>
       <div className="space-y-4 mb-6">
         <div>

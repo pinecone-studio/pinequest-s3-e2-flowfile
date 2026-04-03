@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils'
 const tabs = [
   { label: 'Багш', href: '/teacher' },
   { label: 'Сурагч', href: '/student' },
-  { label: 'Захиргаа', href: '/admin' },
 ]
 
 export function PlatformSwitcher() {
@@ -22,11 +21,10 @@ export function PlatformSwitcher() {
   
   const activeTab = getActiveTab()
   
-  // 36px tall, bg #0A2D6E (header-navy), fixed at top
   return (
     <div 
-      className="h-9 flex items-center justify-center px-4 shrink-0 relative sticky top-0 "
-      style={{ backgroundColor: '#0A2D6E', zIndex: 9999 }}
+      className="fixed inset-x-0 top-0 h-9 flex items-center justify-center px-4 shrink-0"
+      style={{ backgroundColor: '#0A2D6E', zIndex: 40 }}
     >
       {/* Left: Logo */}
       <div className="absolute left-4 flex items-center gap-1.5">

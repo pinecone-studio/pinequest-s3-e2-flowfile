@@ -9,6 +9,7 @@ type TeacherSidebarNavProps = {
   isMobile?: boolean
   navItems: TeacherNavItem[]
   pendingManualTaskCount: number
+  unreadNotificationCount: number
   isActive: (item: TeacherNavItem) => boolean
   onMobileNavigate: () => void
 }
@@ -18,6 +19,7 @@ export function TeacherSidebarNav({
   isMobile = false,
   navItems,
   pendingManualTaskCount,
+  unreadNotificationCount,
   isActive,
   onMobileNavigate,
 }: TeacherSidebarNavProps) {
@@ -73,7 +75,23 @@ export function TeacherSidebarNav({
                     {pendingManualTaskCount}
                   </span>
                 )}
+                {item.href === '/teacher/notifications' && unreadNotificationCount > 0 && (
+                  <span
+                    className="ml-auto text-[11px] px-1.5 py-0.5 rounded-full text-white"
+                    style={{ backgroundColor: '#DC2626' }}
+                  >
+                    {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                  </span>
+                )}
               </>
+            )}
+            {collapsed && !isMobile && item.href === '/teacher/notifications' && unreadNotificationCount > 0 && (
+              <span
+                className="absolute right-1 top-1 min-w-4 h-4 rounded-full px-1 text-[10px] font-semibold text-white flex items-center justify-center"
+                style={{ backgroundColor: '#DC2626' }}
+              >
+                {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+              </span>
             )}
           </Link>
         )

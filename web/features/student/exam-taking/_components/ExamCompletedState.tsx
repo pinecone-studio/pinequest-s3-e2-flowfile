@@ -10,7 +10,10 @@ export function ExamCompletedState({
   onBack: () => void
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 top-9 flex items-center justify-center bg-page-bg p-6">
+    <div
+      className="fixed inset-x-0 bottom-0 flex items-center justify-center bg-page-bg p-6"
+      style={{ top: 'var(--platform-switcher-height)' }}
+    >
       <div className="w-full max-w-md rounded-2xl border border-card-border bg-white p-8 text-center">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
           <CheckCircle2 size={24} className="text-green-600" strokeWidth={1.5} />

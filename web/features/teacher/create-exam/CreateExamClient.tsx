@@ -15,6 +15,7 @@ import { StepQuestions } from './_components/StepQuestions'
 import { StepSchedule } from './_components/StepSchedule'
 import { StepSource } from './_components/StepSource'
 import {
+  applyBulkAnswerKeyToQuestions,
   generateDemoQuestions,
   generateMockAIQuestions,
   getCourseLabel,
@@ -62,6 +63,7 @@ export function CreateExamClient() {
   const [aiGeneratedQuestions, setAiGeneratedQuestions] = useState<Question[]>([])
   const [importingFile, setImportingFile] = useState(false)
   const [importFileName, setImportFileName] = useState('')
+  const [importAnswerKey, setImportAnswerKey] = useState('')
   const [selectedClasses, setSelectedClasses] = useState<string[]>([])
   const [startDate, setStartDate] = useState('')
   const [startTime, setStartTime] = useState('')
@@ -175,6 +177,21 @@ export function CreateExamClient() {
     )
   }
 
+  const handleFillAiDemo = () => {
+    const subjectName = selectedCourse
+      ? SUBJECT_NAMES[selectedCourse.subjectId] ?? selectedCourse.subjectId
+      : 'Математик'
+    const demoTopic =
+      subjectName === 'Математик'
+        ? 'Квадрат тэгшитгэл'
+        : `${subjectName} хичээлийн гол ойлголт`
+
+    setAiTopic(demoTopic)
+    setAiDifficulty('medium')
+    setAiCount(4)
+    setAiGeneratedQuestions(generateMockAIQuestions(demoTopic, 'medium', 4))
+  }
+
   const importFiles = async (fileList: FileList | null) => {
     const files = fileList ? Array.from(fileList) : []
 
@@ -192,13 +209,27 @@ export function CreateExamClient() {
         selectedCourseLabel,
       )
       const importedQuestions = mapImportedQuestions(collected, questions.length)
+      const {
+        questions: importedQuestionsWithAnswers,
+        appliedCount,
+      } = applyBulkAnswerKeyToQuestions(importedQuestions, importAnswerKey)
 
-      if (importedQuestions.length === 0) {
+      if (importedQuestionsWithAnswers.length === 0) {
         throw new Error('Сонгосон файл эсвэл хавтсаас асуулт олдсонгүй.')
       }
 
-      setQuestions((previousQuestions) => [...previousQuestions, ...importedQuestions])
+      setQuestions((previousQuestions) => [
+        ...previousQuestions,
+        ...importedQuestionsWithAnswers,
+      ])
       setQuestionTab('new')
+
+      if (appliedCount > 0) {
+        toast({
+          title: 'Хариултууд холбоогдлоо',
+          description: `${appliedCount} асуултын зөв хариулт answer key-ээс автоматаар орлоо.`,
+        })
+      }
 
       if (failures.length > 0) {
         const [firstFailure] = failures
@@ -358,7 +389,7 @@ export function CreateExamClient() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-36px)]">
+    <div className="flex h-[calc(100dvh-5.25rem)] md:h-[calc(100vh-var(--platform-switcher-height))]">
       <ExamPreviewPanel
         title={title}
         selectedCourseLabel={selectedCourseLabel}
@@ -417,6 +448,7 @@ export function CreateExamClient() {
               aiGeneratedQuestions={aiGeneratedQuestions}
               importingFile={importingFile}
               importFileName={importFileName}
+              importAnswerKey={importAnswerKey}
               onQuestionTab={setQuestionTab}
               onQuestionText={setQuestionText}
               onQuestionType={setQuestionType}
@@ -435,7 +467,9 @@ export function CreateExamClient() {
               onAddAiQuestions={handleAddAiQuestions}
               onFileUpload={handleFileUpload}
               onFolderUpload={handleFolderUpload}
+              onImportAnswerKey={setImportAnswerKey}
               onDemo={handleAddDemoQuestions}
+              onAiDemo={handleFillAiDemo}
             />
           )}
           {currentStep === 4 && (

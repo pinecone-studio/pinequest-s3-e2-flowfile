@@ -1,4 +1,9 @@
 import type { Question } from '@/lib/types'
+import {
+  buildQrCodeUrl,
+  buildStudentExamShareUrl,
+  resolvePublicAppOrigin,
+} from '@/lib/share-links'
 
 const QUICK_QUIZ_STORAGE_KEY = 'teacher.quick-quiz.latest'
 const FALLBACK_OPTIONS = ['Тайлбар', 'Дасгал', 'Жишээ', 'Дүгнэлт']
@@ -14,6 +19,10 @@ export type QuickQuizState = {
   courseLabel?: string
   classLabel?: string
   createdAt: string
+}
+
+export function resolveQuickQuizShareOrigin(origin?: string) {
+  return resolvePublicAppOrigin(origin)
 }
 
 function extractSentences(summary: string) {
@@ -127,19 +136,163 @@ export function generateQuickQuizQuestions(params: {
   return questions.slice(0, count)
 }
 
+export function generateAllTaskDemoQuestions(topic: string): Question[] {
+  const createdAt = Date.now()
+  const normalizedTopic = topic.trim() || 'Бүх төрлийн demo шалгалт'
+
+  return [
+    {
+      id: `full-demo-${createdAt}-1`,
+      examId: '',
+      text: `"${normalizedTopic}" сэдвийн үндсэн ойлголтыг сонгоно уу.`,
+      type: 'single',
+      options: ['Гол ойлголт', 'Хамааралгүй сонголт', 'Жишээ мэдээлэл', 'Туслах тайлбар'],
+      correctAnswer: 'Гол ойлголт',
+      points: 1,
+      order: 1,
+      isManualGrade: false,
+    },
+    {
+      id: `full-demo-${createdAt}-2`,
+      examId: '',
+      text: `"${normalizedTopic}" сэдэвтэй холбоотой зөв сонголтуудыг тэмдэглэнэ үү.`,
+      type: 'multiple',
+      options: ['Томъёо', 'Жишээ', 'Ойлголт', 'Хамааралгүй үг'],
+      correctAnswer: ['Томъёо', 'Жишээ', 'Ойлголт'],
+      points: 2,
+      order: 2,
+      isManualGrade: false,
+    },
+    {
+      id: `full-demo-${createdAt}-3`,
+      examId: '',
+      text: `"${normalizedTopic}" нь өнөөдрийн хичээлийн агуулгад багтсан.`,
+      type: 'truefalse',
+      correctAnswer: 'true',
+      points: 1,
+      order: 3,
+      isManualGrade: false,
+    },
+    {
+      id: `full-demo-${createdAt}-4`,
+      examId: '',
+      text: 'Дараах ойлголтуудыг тайлбартай нь тааруулна уу.',
+      type: 'matching',
+      matchingPairs: [
+        { left: 'Томъёо', right: 'Илэрхийлэл' },
+        { left: 'График', right: 'Дүрслэл' },
+        { left: 'Жишээ', right: 'Хэрэглээ' },
+      ],
+      points: 2,
+      order: 4,
+      isManualGrade: false,
+    },
+    {
+      id: `full-demo-${createdAt}-5`,
+      examId: '',
+      text: `"${normalizedTopic}"-ийн тухай нэг өгүүлбэртэй богино хариулт бичнэ үү.`,
+      type: 'short',
+      correctAnswer: 'Товч тайлбар хүлээн авна.',
+      points: 2,
+      order: 5,
+      isManualGrade: true,
+    },
+    {
+      id: `full-demo-${createdAt}-6`,
+      examId: '',
+      text: `"${normalizedTopic}"-ийн хэрэглээг 3-4 өгүүлбэрээр тайлбарлана уу.`,
+      type: 'long',
+      correctAnswer: 'Гол ойлголт, хэрэглээ, дүгнэлтээ багтаасан байхад болно.',
+      points: 3,
+      order: 6,
+      isManualGrade: true,
+    },
+    {
+      id: `full-demo-${createdAt}-7`,
+      examId: '',
+      text: 'Дараах илэрхийллийг томъёоны keyboard ашиглан бичнэ үү: x² + 2x + 1',
+      type: 'formula',
+      correctAnswer: 'x^2+2x+1',
+      points: 2,
+      order: 7,
+      isManualGrade: true,
+    },
+    {
+      id: `full-demo-${createdAt}-8`,
+      examId: '',
+      text: 'Этанолын бүтцийг химийн editor ашиглан зурна уу.',
+      type: 'chemistry',
+      correctAnswer: 'C2H5OH',
+      points: 2,
+      order: 8,
+      isManualGrade: true,
+    },
+    {
+      id: `full-demo-${createdAt}-9`,
+      examId: '',
+      text: '1-ээс 5 хүртэлх тоонуудын нийлбэрийг олдог JavaScript код бичнэ үү.',
+      type: 'code',
+      correctAnswer: 'for эсвэл reduce ашигласан зөв код байхад болно.',
+      points: 3,
+      order: 9,
+      isManualGrade: true,
+    },
+    {
+      id: `full-demo-${createdAt}-10`,
+      examId: '',
+      text: 'Энэ сэдвийг 20 секунд орчим дуугаар тайлбарлана уу.',
+      type: 'voice',
+      points: 2,
+      order: 10,
+      isManualGrade: true,
+    },
+    {
+      id: `full-demo-${createdAt}-11`,
+      examId: '',
+      text: 'Видео эсвэл зураг ашиглаад бодолтоо тайлбарлан оруулна уу.',
+      type: 'video',
+      points: 2,
+      order: 11,
+      isManualGrade: true,
+    },
+    {
+      id: `full-demo-${createdAt}-12`,
+      examId: '',
+      text: 'Гараар бодсон шийдлээ зураг, скан эсвэл файл хэлбэрээр оруулна уу.',
+      type: 'handwritten',
+      points: 2,
+      order: 12,
+      isManualGrade: true,
+    },
+  ]
+}
+
 export function buildQuickQuizTitle(topic: string) {
   return `${topic.trim()} - Шуурхай quiz`
 }
 
 export function buildQuickQuizShareUrl(examId: string, origin: string) {
-  return new URL(`/student/exams/${examId}`, origin).toString()
+  return buildStudentExamShareUrl(examId, origin)
 }
 
 export function buildQuickQuizQrUrl(shareUrl: string) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(shareUrl)}`
+  return buildQrCodeUrl(shareUrl, 220)
 }
 
-export function readStoredQuickQuiz() {
+export function normalizeQuickQuizState(
+  state: QuickQuizState,
+  origin = resolveQuickQuizShareOrigin(),
+) {
+  const shareUrl = buildQuickQuizShareUrl(state.examId, origin)
+
+  return {
+    ...state,
+    shareUrl,
+    qrCodeUrl: buildQuickQuizQrUrl(shareUrl),
+  }
+}
+
+export function readStoredQuickQuiz(origin?: string) {
   if (typeof window === 'undefined') {
     return null
   }
@@ -151,7 +304,10 @@ export function readStoredQuickQuiz() {
   }
 
   try {
-    return JSON.parse(raw) as QuickQuizState
+    return normalizeQuickQuizState(
+      JSON.parse(raw) as QuickQuizState,
+      resolveQuickQuizShareOrigin(origin),
+    )
   } catch {
     return null
   }
@@ -162,5 +318,8 @@ export function writeStoredQuickQuiz(state: QuickQuizState) {
     return
   }
 
-  window.localStorage.setItem(QUICK_QUIZ_STORAGE_KEY, JSON.stringify(state))
+  window.localStorage.setItem(
+    QUICK_QUIZ_STORAGE_KEY,
+    JSON.stringify(normalizeQuickQuizState(state)),
+  )
 }

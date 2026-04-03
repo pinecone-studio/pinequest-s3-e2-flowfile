@@ -1,4 +1,5 @@
 import { Check, FlaskConical, ImagePlus, Keyboard, Mic, Plus, SquareTerminal, Trash2, Video } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { QuestionType } from '@/lib/types'
 import { QUESTION_TYPE_LABELS } from '@/lib/types'
@@ -33,7 +34,13 @@ export function QuestionTabNew({ questionText, questionType, questionOptions, co
     <div className="bg-white rounded-lg border border-card-border p-6 space-y-4">
       <div>
         <label className="block text-[13px] font-medium text-foreground mb-1.5">Асуултын текст *</label>
-        <textarea value={questionText} onChange={(e) => onQuestionText(e.target.value)} rows={3} placeholder="Асуултаа бичнэ үү..." className="w-full px-3.5 py-2.5 border border-input-border rounded-lg text-[14px] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none resize-none transition-colors" />
+        <Textarea
+          value={questionText}
+          onChange={(e) => onQuestionText(e.target.value)}
+          rows={3}
+          placeholder="Асуултаа бичнэ үү..."
+          className="min-h-[96px] resize-none border-input-border bg-white px-3.5 py-2.5 text-[14px]"
+        />
       </div>
 
       <button className="flex items-center gap-1.5 text-primary text-[13px] hover:underline"><ImagePlus size={14} strokeWidth={1.5} />Зураг нэмэх</button>
@@ -184,12 +191,12 @@ export function QuestionTabNew({ questionText, questionType, questionOptions, co
       {!['single', 'multiple', 'truefalse', 'matching'].includes(questionType) && (
         <div>
           <label className="block text-[13px] font-medium text-foreground mb-2">Зөв хариулт / Тайлбар</label>
-          <textarea
+          <Textarea
             value={typeof correctAnswer === 'string' ? correctAnswer : ''}
             onChange={(e) => onCorrectAnswer(e.target.value)}
             rows={3}
             placeholder="Зөв хариулт, тайлбар эсвэл үнэлгээний чиглэл оруулна уу..."
-            className="w-full px-3.5 py-2.5 border border-input-border rounded-lg text-[14px] focus:border-primary focus:ring-1 focus:ring-primary/20 focus:outline-none resize-none transition-colors"
+            className="min-h-[96px] resize-none border-input-border bg-white px-3.5 py-2.5 text-[14px]"
           />
         </div>
       )}

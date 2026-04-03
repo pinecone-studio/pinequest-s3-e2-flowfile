@@ -10,6 +10,7 @@ import {
 type DevRole = 'student' | 'teacher'
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || ''
+const LOCAL_PROXY_PREFIX = '/api/proxy'
 
 function encodeTokenPayload(payload: Record<string, unknown>) {
   if (typeof window === 'undefined') {
@@ -23,13 +24,41 @@ function getStorageKey(role: DevRole) {
   return `seedcone.dev_auth_token.${role}`
 }
 
+function getUserIdStorageKey(role: DevRole) {
+  return `seedcone.dev_user_id.${role}`
+}
+
 export function isApiConfigured() {
   return apiBaseUrl.length > 0
+}
+
+function shouldUseLocalApiProxy() {
+  if (typeof window === 'undefined' || !isApiConfigured()) {
+    return false
+  }
+
+  const hostname = window.location.hostname
+
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return false
+  }
+
+  try {
+    const resolvedApiUrl = new URL(apiBaseUrl)
+    return resolvedApiUrl.origin !== window.location.origin
+  } catch {
+    return false
+  }
 }
 
 export function getApiUrl(path: string) {
   if (!isApiConfigured()) {
     return null
+  }
+
+  if (shouldUseLocalApiProxy()) {
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`
+    return `${LOCAL_PROXY_PREFIX}${normalizedPath}`
   }
 
   return new URL(path, apiBaseUrl).toString()
@@ -40,6 +69,7 @@ function createDevTokenPayload(role: DevRole) {
   const fallbackUserId = role === 'teacher' ? CURRENT_TEACHER_ID : CURRENT_STUDENT_ID
 
   const userId =
+    window.localStorage.getItem(getUserIdStorageKey(role)) ??
     window.localStorage.getItem('seedcone.dev_user_id') ??
     process.env.NEXT_PUBLIC_DEV_USER_ID ??
     currentUser?.id ??
@@ -54,6 +84,34 @@ function createDevTokenPayload(role: DevRole) {
       `${role}.${String(userId).toLowerCase()}@seedcone.local`,
     name: currentUser?.name ?? userId,
   }
+}
+
+export function setDevAuthIdentity(
+  role: DevRole,
+  payload: {
+    userId: string
+    email: string
+    name: string
+    imageUrl?: string | null
+  },
+) {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  const token = encodeTokenPayload({
+    userId: payload.userId,
+    role,
+    sub: `dev-${payload.userId}`,
+    email: payload.email,
+    name: payload.name,
+    imageUrl: payload.imageUrl ?? null,
+  })
+
+  window.localStorage.setItem(getUserIdStorageKey(role), payload.userId)
+  window.localStorage.setItem(getStorageKey(role), token)
+
+  return token
 }
 
 export function getDevAuthToken(role: DevRole = 'student') {
