@@ -11,6 +11,21 @@ const nextConfig = {
   turbopack: {
     root: __dirname,
   },
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...(config.resolve.alias ?? {}),
+      paper$: path.join(__dirname, 'node_modules/paper/dist/paper-core.js'),
+      canvas: false,
+      jsdom: false,
+      'jsdom/lib/jsdom/living/generated/utils': false,
+      'paper/dist/node/canvas.js': false,
+      'paper/dist/node/extend.js': false,
+      'paper/dist/node/self.js': false,
+      'source-map-support': false,
+    }
+
+    return config
+  },
 }
 
 export default nextConfig

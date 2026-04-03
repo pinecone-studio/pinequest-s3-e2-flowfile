@@ -13,6 +13,7 @@ export interface TeacherExam {
   teacherId: string
   title: string
   subject: string
+  description?: string | null
   status: string
   durationMinutes: number
   startsAt: string | null

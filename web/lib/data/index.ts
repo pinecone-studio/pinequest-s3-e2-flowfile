@@ -12,6 +12,7 @@ export {
   CURRENT_TEACHER_ID,
   getCurrentAdmin,
   getCurrentStudent,
+  getCurrentStudentId,
   getCurrentTeacher,
   initializeData,
   initialAttempts,

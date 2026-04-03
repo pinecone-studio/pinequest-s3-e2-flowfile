@@ -3,6 +3,7 @@ import type { AppNotification, Exam, SchoolClass } from '@/lib/types'
 
 const NOTIFICATIONS_KEY = 'notifications'
 const NOTIFICATION_EVENT = 'seedcone:notifications-changed'
+const TEACHER_NOTIFICATION_REFRESH_EVENT = 'seedcone:teacher-notifications-refresh'
 
 function emitNotificationsChanged() {
   if (typeof window === 'undefined') {
@@ -14,6 +15,18 @@ function emitNotificationsChanged() {
 
 export function getNotificationEventName() {
   return NOTIFICATION_EVENT
+}
+
+export function getTeacherNotificationRefreshEventName() {
+  return TEACHER_NOTIFICATION_REFRESH_EVENT
+}
+
+export function emitTeacherNotificationRefresh() {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.dispatchEvent(new CustomEvent(TEACHER_NOTIFICATION_REFRESH_EVENT))
 }
 
 export function getNotifications(recipientId?: string): AppNotification[] {
@@ -48,6 +61,33 @@ export function saveNotifications(items: AppNotification[]) {
 
   localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(merged))
   emitNotificationsChanged()
+}
+
+export function createLocalNotification(
+  input: Omit<AppNotification, 'id' | 'isRead' | 'createdAt'> & {
+    id?: string
+    isRead?: boolean
+    createdAt?: string
+  },
+) {
+  const notification: AppNotification = {
+    id:
+      input.id ??
+      (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `notif-${Date.now()}`),
+    recipientId: input.recipientId,
+    title: input.title,
+    body: input.body,
+    type: input.type,
+    examId: input.examId,
+    classId: input.classId,
+    isRead: input.isRead ?? false,
+    createdAt: input.createdAt ?? new Date().toISOString(),
+  }
+
+  saveNotifications([notification])
+  return notification
 }
 
 export function markNotificationRead(notificationId: string) {

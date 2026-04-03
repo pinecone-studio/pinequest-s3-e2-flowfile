@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Bell, CheckCheck, User } from 'lucide-react'
 
-import { CURRENT_STUDENT_ID } from '@/lib/data'
+import { getCurrentStudentId } from '@/lib/data'
 import { getNotificationEventName, getNotifications, markAllNotificationsRead, markNotificationRead } from '@/lib/notifications'
 import {
   fetchMyNotifications,
@@ -72,10 +72,11 @@ async function loadStudentNotifications() {
     return fetchMyNotifications()
   }
 
-  return getNotifications(CURRENT_STUDENT_ID)
+  return getNotifications(getCurrentStudentId())
 }
 
 export function StudentTopNav({ pathname, navLinks, studentDisplayName }: StudentTopNavProps) {
+  const currentStudentId = getCurrentStudentId()
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const hasLoadedNotifications = useRef(false)
@@ -164,7 +165,7 @@ export function StudentTopNav({ pathname, navLinks, studentDisplayName }: Studen
         return
       }
 
-      markAllNotificationsRead(CURRENT_STUDENT_ID)
+      markAllNotificationsRead(currentStudentId)
       setNotifications((current) =>
         current.map((item) => (item.isRead ? item : { ...item, isRead: true })),
       )

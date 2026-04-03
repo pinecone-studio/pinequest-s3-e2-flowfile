@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from 'next'
 import 'mathlive/fonts.css'
+import 'ketcher-react/dist/index.css'
 import './globals.css'
+import { PlatformSwitcher } from '@/components/platform-switcher'
 import { DataInitializer } from '@/components/data-initializer'
 import { PwaProvider } from '@/components/pwa-provider'
-import { PlatformSwitcher } from '@/components/platform-switcher'
 import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
@@ -24,15 +25,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="mn">
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased [--platform-switcher-height:36px]">
         <PwaProvider />
         <DataInitializer />
-        <div className="min-h-screen flex flex-col">
-          <PlatformSwitcher />
-          <div className="flex-1">
-            {children}
-          </div>
-        </div>
+        <PlatformSwitcher />
+        <div className="min-h-screen pt-9">{children}</div>
         <Toaster />
       </body>
     </html>

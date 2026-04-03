@@ -1,10 +1,9 @@
 import Link from 'next/link'
-import { Edit, Copy, Printer, Calendar, Lock, Globe } from 'lucide-react'
-import type { Exam } from '@/lib/types'
+import { Edit, Calendar, Lock, Globe, QrCode } from 'lucide-react'
+import { getTeacherExamStatusLabel, type TeacherExamBankRecord } from '@/lib/teacher-exam-bank'
 
-type Subject = { id: string; name: string }
 export function ExamBanner({ exam, subject, subjectColor, isOwner }: {
-  exam: Exam; subject: Subject | null; subjectColor: string; isOwner: boolean
+  exam: TeacherExamBankRecord; subject?: { id: string; name: string } | null; subjectColor: string; isOwner: boolean
 }) {
   return (
     <div className="bg-white border rounded-[10px] overflow-hidden mb-6" style={{ borderColor: '#DDE1E7' }}>
@@ -20,10 +19,12 @@ export function ExamBanner({ exam, subject, subjectColor, isOwner }: {
           <div>
             <h1 className="text-[22px] font-semibold mb-2" style={{ color: '#1A1A2E' }}>{exam.title}</h1>
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ backgroundColor: `${subjectColor}20`, color: subjectColor }}>{subject?.name || exam.subjectId}</span>
-              <span className="px-2 py-0.5 rounded text-[11px]" style={{ backgroundColor: '#F5F7FA', color: '#5A6474' }}>{exam.grade}-р анги</span>
+              <span className="px-2 py-0.5 rounded text-[11px] font-medium" style={{ backgroundColor: `${subjectColor}20`, color: subjectColor }}>{subject?.name || exam.subjectName}</span>
+              {typeof exam.grade === 'number' && (
+                <span className="px-2 py-0.5 rounded text-[11px]" style={{ backgroundColor: '#F5F7FA', color: '#5A6474' }}>{exam.grade}-р анги</span>
+              )}
               <span className="px-2 py-0.5 rounded-full text-[11px] font-medium" style={exam.status === 'published' ? { backgroundColor: 'rgba(26, 122, 74, 0.12)', color: '#1A7A4A' } : { backgroundColor: 'rgba(90, 100, 116, 0.12)', color: '#5A6474' }}>
-                {exam.status === 'published' ? 'Нийтлэгдсэн' : 'Ноорог'}
+                {getTeacherExamStatusLabel(exam.status)}
               </span>
             </div>
           </div>
@@ -33,9 +34,10 @@ export function ExamBanner({ exam, subject, subjectColor, isOwner }: {
                 <Edit size={14} strokeWidth={1.5} />Засах
               </Link>
             )}
-            <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] border transition-colors hover:bg-[#F5F7FA]" style={{ borderColor: '#DDE1E7', color: '#5A6474' }}><Copy size={14} strokeWidth={1.5} />Хувилах</button>
-            <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] border transition-colors hover:bg-[#F5F7FA]" style={{ borderColor: '#DDE1E7', color: '#5A6474' }}><Printer size={14} strokeWidth={1.5} />Хэвлэх</button>
-            <Link href={`/teacher/exams/schedule?examId=${exam.id}`} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium text-white" style={{ backgroundColor: '#0066FF' }}>
+            <a href="#exam-share" className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] border transition-colors hover:bg-[#F5F7FA]" style={{ borderColor: '#DDE1E7', color: '#5A6474' }}>
+              <QrCode size={14} strokeWidth={1.5} />QR share
+            </a>
+            <Link href={`/teacher/schedule?examId=${exam.id}`} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium text-white" style={{ backgroundColor: '#0066FF' }}>
               <Calendar size={14} strokeWidth={1.5} />Товлох
             </Link>
           </div>

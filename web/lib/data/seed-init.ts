@@ -72,8 +72,31 @@ export function getCurrentTeacher(): User | undefined {
   return seedUsers.find(u => u.id === CURRENT_TEACHER_ID)
 }
 
+export function getCurrentStudentId(): string {
+  if (typeof window === 'undefined') {
+    return CURRENT_STUDENT_ID
+  }
+
+  return (
+    window.localStorage.getItem('seedcone.dev_user_id.student') ??
+    window.localStorage.getItem('seedcone.dev_user_id') ??
+    CURRENT_STUDENT_ID
+  )
+}
+
 export function getCurrentStudent(): User | undefined {
-  return seedUsers.find(u => u.id === CURRENT_STUDENT_ID)
+  const resolvedId = getCurrentStudentId()
+
+  if (typeof window !== 'undefined') {
+    const storedUsers = getAll<User>('users')
+    const storedUser = storedUsers.find((user) => user.id === resolvedId)
+
+    if (storedUser) {
+      return storedUser
+    }
+  }
+
+  return seedUsers.find(u => u.id === resolvedId)
 }
 
 export function getCurrentAdmin(): User | undefined {

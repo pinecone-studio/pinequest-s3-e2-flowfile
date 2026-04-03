@@ -34,10 +34,6 @@ type BrowserFaceDetectorConstructor = new (options?: {
   maxDetectedFaces?: number
 }) => BrowserFaceDetector
 
-type BrowserNavigator = Navigator & {
-  deviceMemory?: number
-}
-
 type ProctoringPreviewStatus =
   | 'camera'
   | 'tracking'
@@ -95,9 +91,12 @@ const STATUS_LABELS: Record<ProctoringPreviewStatus, string> = {
 }
 
 const ANALYSIS_INTERVAL_MS = 3000
+const MOBILE_ANALYSIS_INTERVAL_MS = 4500
 const SUSTAINED_ALERT_FRAMES = 2
 const DETECTION_CANVAS_WIDTH = 160
 const DETECTION_CANVAS_HEIGHT = 120
+const MOBILE_DETECTION_CANVAS_WIDTH = 128
+const MOBILE_DETECTION_CANVAS_HEIGHT = 96
 const MAX_SLOW_ANALYSIS_MS = 450
 const MAX_SLOW_ANALYSIS_COUNT = 3
 
@@ -193,7 +192,6 @@ function StudentProctoringPreviewComponent({
 }: StudentProctoringPreviewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const dragStartRef = useRef<{ x: number; y: number } | null>(null)
   const detectorRef = useRef<BrowserFaceDetector | null>(null)
   const detectionCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const detectionTimeoutRef = useRef<number | null>(null)
@@ -209,7 +207,6 @@ function StudentProctoringPreviewComponent({
   const activeAlertRef = useRef<ProctoringAlertType | null>(null)
   const statusRef = useRef<ProctoringPreviewStatus>('camera')
   const [isMobile, setIsMobile] = useState(false)
-  const [position, setPosition] = useState({ x: 0, y: 0 })
   const [status, setStatus] = useState<ProctoringPreviewStatus>('camera')
 
   const setPreviewStatus = useEffectEvent((nextStatus: ProctoringPreviewStatus) => {
@@ -288,24 +285,7 @@ function StudentProctoringPreviewComponent({
 
   useEffect(() => {
     const updateViewport = () => {
-      const mobile = window.innerWidth < 768
-      setIsMobile(mobile)
-
-      if (mobile) {
-        setPosition((prev) => {
-          if (prev.x !== 0 || prev.y !== 0) {
-            return prev
-          }
-
-          const width = 184
-          const height = 132
-
-          return {
-            x: Math.max(12, window.innerWidth - width - 12),
-            y: Math.max(104, window.innerHeight - height - 96),
-          }
-        })
-      }
+      setIsMobile(window.innerWidth < 768)
     }
 
     updateViewport()
@@ -318,17 +298,11 @@ function StudentProctoringPreviewComponent({
       return
     }
 
-    const navigatorInfo = navigator as BrowserNavigator
-    const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches
-    const isLowPowerDevice =
-      isCoarsePointer ||
-      window.innerWidth < 768 ||
-      (typeof navigator.hardwareConcurrency === 'number' &&
-        navigator.hardwareConcurrency <= 4) ||
-      (typeof navigatorInfo.deviceMemory === 'number' &&
-        navigatorInfo.deviceMemory <= 4)
+    detectorRef.current = null
+    detectionCanvasRef.current = null
+    trackingEnabledRef.current = false
 
-    if (!window.FaceDetector || isLowPowerDevice) {
+    if (!window.FaceDetector) {
       trackingEnabledRef.current = false
       detectorRef.current = null
       setPreviewStatus('unsupported')
@@ -341,8 +315,12 @@ function StudentProctoringPreviewComponent({
         maxDetectedFaces: 2,
       })
       detectionCanvasRef.current = document.createElement('canvas')
-      detectionCanvasRef.current.width = DETECTION_CANVAS_WIDTH
-      detectionCanvasRef.current.height = DETECTION_CANVAS_HEIGHT
+      detectionCanvasRef.current.width = isMobile
+        ? MOBILE_DETECTION_CANVAS_WIDTH
+        : DETECTION_CANVAS_WIDTH
+      detectionCanvasRef.current.height = isMobile
+        ? MOBILE_DETECTION_CANVAS_HEIGHT
+        : DETECTION_CANVAS_HEIGHT
       trackingEnabledRef.current = true
       setPreviewStatus('tracking')
     } catch {
@@ -350,64 +328,7 @@ function StudentProctoringPreviewComponent({
       trackingEnabledRef.current = false
       setPreviewStatus('unsupported')
     }
-  }, [setPreviewStatus])
-
-  const clampPosition = (x: number, y: number) => {
-    const width = 184
-    const height = 132
-
-    return {
-      x: Math.min(Math.max(12, x), Math.max(12, window.innerWidth - width - 12)),
-      y: Math.min(Math.max(88, y), Math.max(88, window.innerHeight - height - 12)),
-    }
-  }
-
-  const startDrag = (clientX: number, clientY: number) => {
-    dragStartRef.current = { x: clientX - position.x, y: clientY - position.y }
-  }
-
-  const moveDrag = (clientX: number, clientY: number) => {
-    if (!dragStartRef.current) {
-      return
-    }
-
-    const next = clampPosition(
-      clientX - dragStartRef.current.x,
-      clientY - dragStartRef.current.y,
-    )
-    setPosition(next)
-  }
-
-  useEffect(() => {
-    if (!isMobile) {
-      return
-    }
-
-    const handleMouseMove = (event: MouseEvent) => moveDrag(event.clientX, event.clientY)
-    const handleTouchMove = (event: TouchEvent) => {
-      const touch = event.touches[0]
-      if (!touch) {
-        return
-      }
-
-      moveDrag(touch.clientX, touch.clientY)
-    }
-    const stopDrag = () => {
-      dragStartRef.current = null
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', stopDrag)
-    window.addEventListener('touchmove', handleTouchMove, { passive: true })
-    window.addEventListener('touchend', stopDrag)
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', stopDrag)
-      window.removeEventListener('touchmove', handleTouchMove)
-      window.removeEventListener('touchend', stopDrag)
-    }
-  }, [isMobile])
+  }, [isMobile, setPreviewStatus])
 
   useEffect(() => {
     if (!trackingEnabledRef.current || !detectorRef.current) {
@@ -550,6 +471,10 @@ function StudentProctoringPreviewComponent({
       }
     }
 
+    const analysisIntervalMs = isMobile
+      ? MOBILE_ANALYSIS_INTERVAL_MS
+      : ANALYSIS_INTERVAL_MS
+
     const scheduleNextAnalysis = () => {
       if (isCancelled) {
         return
@@ -557,7 +482,7 @@ function StudentProctoringPreviewComponent({
 
       detectionTimeoutRef.current = window.setTimeout(() => {
         void runAnalysisLoop()
-      }, ANALYSIS_INTERVAL_MS)
+      }, analysisIntervalMs)
     }
 
     const runAnalysisLoop = async () => {
@@ -592,36 +517,21 @@ function StudentProctoringPreviewComponent({
         window.clearTimeout(detectionTimeoutRef.current)
       }
     }
-  }, [emitViolation, setPreviewStatus])
+  }, [emitViolation, isMobile, setPreviewStatus])
 
   if (isMobile) {
     return (
-      <div
-        className="fixed z-40 overflow-hidden rounded-xl border border-white/20 bg-black shadow-2xl"
-        style={{
-          left: position.x,
-          top: position.y,
-          width: 184,
-        }}
-        onMouseDown={(event) => startDrag(event.clientX, event.clientY)}
-        onTouchStart={(event) => {
-          const touch = event.touches[0]
-          if (!touch) {
-            return
-          }
-          startDrag(touch.clientX, touch.clientY)
-        }}
-      >
-        <div className="flex items-center justify-between bg-black/70 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-white/80">
+      <div className="pointer-events-none fixed right-3 top-24 z-40 overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl">
+        <div className="flex items-center justify-between bg-black/70 px-2 py-1 text-[9px] font-medium uppercase tracking-[0.18em] text-white/80">
           <span>{STATUS_LABELS[status]}</span>
-          <span>Move</span>
+          <span>Live</span>
         </div>
         <video
           ref={videoRef}
           autoPlay
           muted
           playsInline
-          className="h-[104px] w-full object-cover"
+          className="h-[80px] w-[112px] object-cover"
         />
       </div>
     )

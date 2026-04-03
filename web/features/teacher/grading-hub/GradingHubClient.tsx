@@ -23,29 +23,41 @@ type GradingCardData = {
   stats: { submitted: number; graded: number; total: number }
 }
 
+const ALL_PARTICIPANTS_CLASS = {
+  id: 'api',
+  name: 'Бүх оролцогч',
+}
+
 function resolveApiClass(
   classes: SchoolClass[],
   studentIds: string[],
 ) {
-  const ranked = classes
-    .map((schoolClass) => ({
-      schoolClass,
-      overlap: studentIds.filter((studentId) =>
-        schoolClass.studentIds.includes(studentId),
-      ).length,
-    }))
-    .sort((left, right) => right.overlap - left.overlap)
+  const uniqueStudentIds = [...new Set(studentIds)]
 
-  if ((ranked[0]?.overlap ?? 0) === 0) {
-    return {
-      id: 'api',
-      name: 'Онлайн урсгал',
-    }
+  if (uniqueStudentIds.length === 0) {
+    return ALL_PARTICIPANTS_CLASS
+  }
+
+  const matchedClasses = classes.filter((schoolClass) =>
+    uniqueStudentIds.some((studentId) => schoolClass.studentIds.includes(studentId)),
+  )
+
+  if (matchedClasses.length !== 1) {
+    return ALL_PARTICIPANTS_CLASS
+  }
+
+  const [resolvedClass] = matchedClasses
+  const allStudentsBelongToClass = uniqueStudentIds.every((studentId) =>
+    resolvedClass.studentIds.includes(studentId),
+  )
+
+  if (!allStudentsBelongToClass) {
+    return ALL_PARTICIPANTS_CLASS
   }
 
   return {
-    id: ranked[0].schoolClass.id,
-    name: ranked[0].schoolClass.name,
+    id: resolvedClass.id,
+    name: resolvedClass.name,
   }
 }
 
@@ -170,7 +182,9 @@ export function GradingHubClient() {
 
             const resolvedClass = resolveApiClass(
               classes,
-              enrollments.map((enrollment) => enrollment.studentId),
+              relevantSessions.map((session) => session.studentId).length > 0
+                ? relevantSessions.map((session) => session.studentId)
+                : enrollments.map((enrollment) => enrollment.studentId),
             )
 
             return {

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { EnrollmentRepository } from './enrollment.repository';
 import { ExamRepository } from '../exam/exam.repository';
 import { NotificationService } from '../notification/notification.service';
+import { UserRepository } from 'src/database/repositories/user.repository';
 
 @Injectable()
 export class EnrollmentService {
@@ -9,9 +10,39 @@ export class EnrollmentService {
     private readonly enrollmentRepo: EnrollmentRepository,
     private readonly examRepo: ExamRepository,
     private readonly notificationService: NotificationService,
+    private readonly userRepo: UserRepository,
   ) {}
 
-  async enrollStudent(examId: string, studentId: string) {
+  private async ensureStudentUser(studentId: string, studentName?: string) {
+    const existingUser = await this.userRepo.findById(studentId);
+
+    if (existingUser) {
+      return existingUser;
+    }
+
+    const now = new Date().toISOString();
+    const fallbackSuffix = studentId.slice(-6).toUpperCase();
+
+    return this.userRepo.create({
+      id: studentId,
+      clerkUserId: `qr-${studentId}`,
+      email: `${studentId.toLowerCase()}@qr.e-shalgalt.local`,
+      name: studentName?.trim() || `QR сурагч ${fallbackSuffix}`,
+      role: 'student',
+      imageUrl: null,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  async enrollStudent(
+    examId: string,
+    studentId: string,
+    metadata?: { studentName?: string },
+  ) {
+    await this.ensureStudentUser(studentId, metadata?.studentName);
+
     const existingEnrollment =
       await this.enrollmentRepo.findEnrollmentByExamAndStudent(examId, studentId);
 

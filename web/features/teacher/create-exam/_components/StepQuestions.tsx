@@ -14,26 +14,27 @@ export function StepQuestions({
   matchingPairs,
   bankSearchQuery, selectedBankQuestions, filteredBankQuestions,
   aiTopic, aiDifficulty, aiCount, aiGenerating, aiGeneratedQuestions,
-  importingFile, importFileName,
+  importingFile, importFileName, importAnswerKey,
   onQuestionTab, onQuestionText, onQuestionType, onQuestionOptions, onCorrectAnswer, onQuestionPoints, onMatchingPairs,
   onBankSearchQuery, onSelectedBankQuestions, onAddQuestion, onAddFromBank,
   onAiTopic, onAiDifficulty, onAiCount, onAiGenerate, onAddAiQuestions,
-  onFileUpload, onFolderUpload, onDemo,
+  onFileUpload, onFolderUpload, onImportAnswerKey, onDemo, onAiDemo,
 }: {
   questionTab: QuestionTab; questionText: string; questionType: QuestionType
   questionOptions: string[]; correctAnswer: string | string[]; questionPoints: number
   matchingPairs: { left: string; right: string }[]
   bankSearchQuery: string; selectedBankQuestions: string[]; filteredBankQuestions: Question[]
   aiTopic: string; aiDifficulty: 'easy' | 'medium' | 'hard'; aiCount: number; aiGenerating: boolean; aiGeneratedQuestions: Question[]
-  importingFile: boolean; importFileName: string
+  importingFile: boolean; importFileName: string; importAnswerKey: string
   onQuestionTab: (tab: QuestionTab) => void; onQuestionText: (v: string) => void; onQuestionType: (v: QuestionType) => void
   onQuestionOptions: (v: string[]) => void; onCorrectAnswer: (v: string | string[]) => void; onQuestionPoints: (v: number) => void; onMatchingPairs: (pairs: { left: string; right: string }[]) => void
   onBankSearchQuery: (v: string) => void; onSelectedBankQuestions: (ids: string[]) => void
   onAddQuestion: () => void; onAddFromBank: () => void
   onAiTopic: (v: string) => void; onAiDifficulty: (v: 'easy' | 'medium' | 'hard') => void; onAiCount: (v: number) => void
   onAiGenerate: () => void; onAddAiQuestions: (ids: string[]) => void
-  onFileUpload: (e: ChangeEvent<HTMLInputElement>) => void; onFolderUpload: (e: ChangeEvent<HTMLInputElement>) => void
+  onFileUpload: (e: ChangeEvent<HTMLInputElement>) => void; onFolderUpload: (e: ChangeEvent<HTMLInputElement>) => void; onImportAnswerKey: (value: string) => void
   onDemo: () => void
+  onAiDemo: () => void
 }) {
   return (
     <div className="max-w-2xl mx-auto">
@@ -56,8 +57,8 @@ export function StepQuestions({
       </div>
       {questionTab === 'new' && <QuestionTabNew questionText={questionText} questionType={questionType} questionOptions={questionOptions} correctAnswer={correctAnswer} questionPoints={questionPoints} matchingPairs={matchingPairs} onQuestionText={onQuestionText} onQuestionType={onQuestionType} onQuestionOptions={onQuestionOptions} onCorrectAnswer={onCorrectAnswer} onQuestionPoints={onQuestionPoints} onMatchingPairs={onMatchingPairs} onAddQuestion={onAddQuestion} />}
       {questionTab === 'bank' && <QuestionTabBank bankSearchQuery={bankSearchQuery} selectedBankQuestions={selectedBankQuestions} filteredBankQuestions={filteredBankQuestions} onBankSearchQuery={onBankSearchQuery} onSelectedBankQuestions={onSelectedBankQuestions} onAddFromBank={onAddFromBank} />}
-      {questionTab === 'ai' && <QuestionTabAI aiTopic={aiTopic} aiDifficulty={aiDifficulty} aiCount={aiCount} aiGenerating={aiGenerating} aiGeneratedQuestions={aiGeneratedQuestions} onAiTopic={onAiTopic} onAiDifficulty={onAiDifficulty} onAiCount={onAiCount} onAiGenerate={onAiGenerate} onAddAiQuestions={onAddAiQuestions} />}
-      {questionTab === 'file' && <QuestionTabFile importingFile={importingFile} importFileName={importFileName} onFileUpload={onFileUpload} onFolderUpload={onFolderUpload} />}
+      {questionTab === 'ai' && <QuestionTabAI aiTopic={aiTopic} aiDifficulty={aiDifficulty} aiCount={aiCount} aiGenerating={aiGenerating} aiGeneratedQuestions={aiGeneratedQuestions} onAiTopic={onAiTopic} onAiDifficulty={onAiDifficulty} onAiCount={onAiCount} onAiGenerate={onAiGenerate} onAddAiQuestions={onAddAiQuestions} onDemo={onAiDemo} />}
+      {questionTab === 'file' && <QuestionTabFile importingFile={importingFile} importFileName={importFileName} answerInput={importAnswerKey} onAnswerInput={onImportAnswerKey} onFileUpload={onFileUpload} onFolderUpload={onFolderUpload} />}
     </div>
   )
 }

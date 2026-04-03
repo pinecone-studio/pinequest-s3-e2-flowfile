@@ -39,6 +39,7 @@ type StudentSessionStatus =
   | 'in_progress'
   | 'submitted'
   | 'force_submitted'
+  | 'graded'
 
 export interface StudentExamQuestion {
   id: string
@@ -71,6 +72,7 @@ export interface StudentExamSummary {
     status: StudentSessionStatus
     startedAt: string | null
     submittedAt: string | null
+    score: number | null
   } | null
   enrolledAt: string
   attemptStatus: StudentExamStatus
@@ -101,6 +103,7 @@ interface RawStudentExamSummary {
     status: StudentSessionStatus
     startedAt: string | null
     submittedAt: string | null
+    score: number | null
   } | null
   enrolledAt: string
   attemptStatus: StudentExamStatus
@@ -131,6 +134,7 @@ interface ApiAttemptResponse {
     status: StudentSessionStatus
     startedAt: string | null
     submittedAt: string | null
+    score: number | null
   }
   questions: Array<{
     id: string
@@ -199,8 +203,6 @@ export function mapAttemptToQuestionList(
   attempt: ApiAttemptResponse,
 ): StudentExamQuestion[] {
   return attempt.questions
-    .slice()
-    .sort((left, right) => left.orderIndex - right.orderIndex)
     .map((question) => {
       const type = getQuestionTypeFromApi(
         question.inputType,
@@ -270,6 +272,28 @@ export async function startExamSession(examId: string) {
     submittedAt: string | null
   }>(`/sessions/exam/${examId}/start`, {
     method: 'POST',
+  })
+}
+
+export async function joinQrExam(
+  examId: string,
+  studentId: string,
+  options?: {
+    studentName?: string
+  },
+) {
+  return apiFetch<{
+    id: string
+    examId: string
+    studentId: string
+    assignedAt: string
+  }>('/enrollments', {
+    method: 'POST',
+    body: JSON.stringify({
+      examId,
+      studentId,
+      studentName: options?.studentName,
+    }),
   })
 }
 

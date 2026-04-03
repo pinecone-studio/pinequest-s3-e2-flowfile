@@ -1,5 +1,10 @@
-import { ExamGrade } from '@/features/teacher/exam-detail/ExamGrade'
+import { redirect } from 'next/navigation'
 
-export default function Page({ params }: { params: Promise<{ id: string }> }) {
-  return <ExamGrade params={params} />
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  redirect(`/teacher/grading/${id}/api`)
 }

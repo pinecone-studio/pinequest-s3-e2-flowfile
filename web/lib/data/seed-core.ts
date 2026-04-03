@@ -78,17 +78,17 @@ export const seedClasses: SchoolClass[] = [
 
 export const seedCourses: Course[] = [
   // T003 - Б. Цэцэгмаа teaches Math to grades 9, 10
-  { id: 'CRS-MAT-9', subjectId: 'МАТ', grade: 9, year: '2024–2025', teacherId: 'T003', classIds: ['C09-1', 'C09-2'] },
-  { id: 'CRS-MAT-10', subjectId: 'МАТ', grade: 10, year: '2024–2025', teacherId: 'T003', classIds: ['C10-1', 'C10-2'] },
-  { id: 'CRS-MED-10', subjectId: 'МЭД', grade: 10, year: '2024–2025', teacherId: 'T003', classIds: ['C10-1', 'C10-2'] },
+  { id: 'CRS-MAT-9', subjectId: 'МАТ', grade: 9, year: '2025–2026', teacherId: 'T003', classIds: ['C09-1', 'C09-2'] },
+  { id: 'CRS-MAT-10', subjectId: 'МАТ', grade: 10, year: '2025–2026', teacherId: 'T003', classIds: ['C10-1', 'C10-2'] },
+  { id: 'CRS-MED-10', subjectId: 'МЭД', grade: 10, year: '2025–2026', teacherId: 'T003', classIds: ['C10-1', 'C10-2'] },
   
   // T004 - О. Энхбаяр teaches Physics
-  { id: 'CRS-FIZ-10', subjectId: 'ФИЗ', grade: 10, year: '2024–2025', teacherId: 'T004', classIds: ['C10-1', 'C10-2'] },
-  { id: 'CRS-FIZ-11', subjectId: 'ФИЗ', grade: 11, year: '2024–2025', teacherId: 'T004', classIds: ['C11-1'] },
+  { id: 'CRS-FIZ-10', subjectId: 'ФИЗ', grade: 10, year: '2025–2026', teacherId: 'T004', classIds: ['C10-1', 'C10-2'] },
+  { id: 'CRS-FIZ-11', subjectId: 'ФИЗ', grade: 11, year: '2025–2026', teacherId: 'T004', classIds: ['C11-1'] },
   
   // T005 - Н. Ариунаа teaches Chemistry & Biology
-  { id: 'CRS-HIM-10', subjectId: 'ХИМ', grade: 10, year: '2024–2025', teacherId: 'T005', classIds: ['C10-1', 'C10-2'] },
-  { id: 'CRS-BIO-10', subjectId: 'БИО', grade: 10, year: '2024–2025', teacherId: 'T005', classIds: ['C10-1', 'C10-2'] },
+  { id: 'CRS-HIM-10', subjectId: 'ХИМ', grade: 10, year: '2025–2026', teacherId: 'T005', classIds: ['C10-1', 'C10-2'] },
+  { id: 'CRS-BIO-10', subjectId: 'БИО', grade: 10, year: '2025–2026', teacherId: 'T005', classIds: ['C10-1', 'C10-2'] },
 ]
 
 export const seedSchedules: Schedule[] = [

@@ -1,10 +1,11 @@
 import { AlertTriangle, ChevronLeft } from 'lucide-react'
 
-const GLOBAL_NAV_HEIGHT_CLASS = 'top-9'
-
 export function ExamNotFoundState({ onBack }: { onBack: () => void }) {
   return (
-    <div className={`fixed inset-x-0 bottom-0 ${GLOBAL_NAV_HEIGHT_CLASS} bg-page-bg flex items-center justify-center p-6`}>
+    <div
+      className="fixed inset-x-0 bottom-0 bg-page-bg flex items-center justify-center p-6"
+      style={{ top: 'var(--platform-switcher-height)' }}
+    >
       <div className="bg-white border border-card-border rounded-2xl p-8 text-center max-w-md w-full">
         <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
           <AlertTriangle size={24} className="text-amber-600" strokeWidth={1.5} />

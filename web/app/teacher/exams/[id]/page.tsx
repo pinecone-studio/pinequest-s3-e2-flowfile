@@ -1,5 +1,5 @@
-import { ExamDetail } from '@/features/teacher/exam-detail/ExamDetail'
+import { QuestionDetail } from '@/features/teacher/question-detail/QuestionDetail'
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
-  return <ExamDetail params={params} />
+  return <QuestionDetail params={params} />
 }

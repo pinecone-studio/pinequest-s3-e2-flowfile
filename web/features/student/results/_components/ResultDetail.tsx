@@ -57,10 +57,18 @@ export function ResultDetail({
     )
   }
 
-  const percentage = Math.round((selectedResult.totalScore / selectedResult.maxScore) * 100)
+  const percentage =
+    selectedResult.maxScore > 0
+      ? Math.round((selectedResult.totalScore / selectedResult.maxScore) * 100)
+      : 0
   const grade = getGrade(percentage)
   const strokeColor = percentage >= 80 ? '#22c55e' : percentage >= 60 ? '#0066ff' : '#ef4444'
   const circumference = 402
+  const hasDetailedScores = examQuestions.some((question) =>
+    Object.prototype.hasOwnProperty.call(selectedResult.scorePerQuestion, question.id),
+  )
+  const scoreRatio =
+    selectedResult.maxScore > 0 ? selectedResult.totalScore / selectedResult.maxScore : 0
 
   return (
     <div className="space-y-6">
@@ -70,7 +78,7 @@ export function ResultDetail({
             <svg className="w-full h-full -rotate-90">
               <circle cx="72" cy="72" r="64" fill="none" stroke="#E8EBF0" strokeWidth="10" />
               <circle cx="72" cy="72" r="64" fill="none" stroke={strokeColor} strokeWidth="10"
-                strokeDasharray={`${(selectedResult.totalScore / selectedResult.maxScore) * circumference} ${circumference}`}
+                strokeDasharray={`${scoreRatio * circumference} ${circumference}`}
                 strokeLinecap="round"
               />
             </svg>
@@ -101,11 +109,15 @@ export function ResultDetail({
       <div className="bg-white border border-card-border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-divider flex items-center justify-between">
           <h3 className="text-[15px] font-semibold text-foreground">Асуулт бүрийн үр дүн</h3>
-          <div className="flex items-center gap-4 text-[12px]">
-            <div className="flex items-center gap-1.5"><CheckCircle size={14} className="text-green-500" strokeWidth={1.5} /><span className="text-text-secondary">Зөв</span></div>
-            <div className="flex items-center gap-1.5"><XCircle size={14} className="text-red-500" strokeWidth={1.5} /><span className="text-text-secondary">Буруу</span></div>
-            <div className="flex items-center gap-1.5"><MinusCircle size={14} className="text-gray-400" strokeWidth={1.5} /><span className="text-text-secondary">Хариулаагүй</span></div>
-          </div>
+          {hasDetailedScores ? (
+            <div className="flex items-center gap-4 text-[12px]">
+              <div className="flex items-center gap-1.5"><CheckCircle size={14} className="text-green-500" strokeWidth={1.5} /><span className="text-text-secondary">Зөв</span></div>
+              <div className="flex items-center gap-1.5"><XCircle size={14} className="text-red-500" strokeWidth={1.5} /><span className="text-text-secondary">Буруу</span></div>
+              <div className="flex items-center gap-1.5"><MinusCircle size={14} className="text-gray-400" strokeWidth={1.5} /><span className="text-text-secondary">Хариулаагүй</span></div>
+            </div>
+          ) : (
+            <p className="text-[12px] text-text-secondary">Нарийвчилсан асуултын оноо хараахан ирээгүй байна.</p>
+          )}
         </div>
         <div className="divide-y divide-divider">
           {examQuestions.map((q, index) => (
@@ -113,7 +125,11 @@ export function ResultDetail({
               key={q.id}
               question={q}
               index={index}
-              score={selectedResult.scorePerQuestion[q.id] || 0}
+              score={
+                Object.prototype.hasOwnProperty.call(selectedResult.scorePerQuestion, q.id)
+                  ? selectedResult.scorePerQuestion[q.id]
+                  : undefined
+              }
               userAnswer={selectedAttempt?.answers[q.id] as string | string[] | undefined}
             />
           ))}

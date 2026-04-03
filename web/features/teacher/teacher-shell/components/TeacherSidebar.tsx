@@ -12,6 +12,7 @@ type TeacherSidebarProps = {
   isMobile?: boolean
   teacher: User | undefined
   pendingManualTaskCount: number
+  unreadNotificationCount: number
   isActive: (item: TeacherNavItem) => boolean
   navItems: TeacherNavItem[]
   onMobileNavigate: () => void
@@ -23,6 +24,7 @@ export function TeacherSidebar({
   isMobile = false,
   teacher,
   pendingManualTaskCount,
+  unreadNotificationCount,
   isActive,
   navItems,
   onMobileNavigate,
@@ -34,7 +36,11 @@ export function TeacherSidebar({
         'bg-white border-r flex flex-col transition-all duration-200 md:sticky md:top-9 md:self-start',
         isMobile ? 'w-[220px]' : collapsed ? 'w-14' : 'w-[220px]'
       )}
-      style={{ borderColor: '#DDE1E7', minHeight: 'calc(100vh - 36px)', height: 'calc(100vh - 36px)' }}
+      style={{
+        borderColor: '#DDE1E7',
+        minHeight: 'calc(100vh - var(--platform-switcher-height))',
+        height: 'calc(100vh - var(--platform-switcher-height))',
+      }}
     >
       <div
         className={cn('p-4 border-b', collapsed && !isMobile && 'px-2')}
@@ -55,6 +61,7 @@ export function TeacherSidebar({
         isMobile={isMobile}
         navItems={navItems}
         pendingManualTaskCount={pendingManualTaskCount}
+        unreadNotificationCount={unreadNotificationCount}
         isActive={isActive}
         onMobileNavigate={onMobileNavigate}
       />

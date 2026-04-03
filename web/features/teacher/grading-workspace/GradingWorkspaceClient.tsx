@@ -14,7 +14,6 @@ import {
   gradeExamSession,
   isApiConfigured,
   mapTeacherApiQuestionToLocalQuestion,
-  type ExamSession,
   type TeacherExamAnswer,
 } from '@/lib/api/teacher-exams'
 import type { Question, Submission, User as UserType } from '@/lib/types'
@@ -44,6 +43,8 @@ type WorkspaceSession = {
   score: number | null
   startedAt: string | null
 }
+
+const ALL_PARTICIPANTS_LABEL = 'Бүх оролцогч'
 
 function parseStoredAnswer(
   value: string | null,
@@ -346,7 +347,7 @@ export function GradingWorkspaceClient({
 
         setExamTitle(exam.title)
         setClassLabel(
-          resolvedClass?.name ?? (classId === 'api' ? 'Онлайн урсгал' : undefined),
+          resolvedClass?.name ?? (classId === 'api' ? ALL_PARTICIPANTS_LABEL : undefined),
         )
         setAllQuestions(normalizedQuestions)
         setQuestions(manualQuestions)
@@ -557,7 +558,7 @@ export function GradingWorkspaceClient({
 
   if (!isLoaded) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-36px)]">
+      <div className="flex items-center justify-center h-[calc(100dvh-5.25rem)] md:h-[calc(100vh-var(--platform-switcher-height))]">
         <div className="text-text-secondary">Ачааллаж байна...</div>
       </div>
     )
@@ -565,7 +566,7 @@ export function GradingWorkspaceClient({
 
   if (!examTitle) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-36px)]">
+      <div className="flex items-center justify-center h-[calc(100dvh-5.25rem)] md:h-[calc(100vh-var(--platform-switcher-height))]">
         <div className="text-text-secondary">Шалгалт олдсонгүй...</div>
       </div>
     )
@@ -573,7 +574,7 @@ export function GradingWorkspaceClient({
 
   if (questions.length === 0) {
     return (
-      <div className="flex h-[calc(100vh-36px)]">
+      <div className="flex h-[calc(100dvh-5.25rem)] md:h-[calc(100vh-var(--platform-switcher-height))]">
         <GradingStudentSidebar
           examTitle={examTitle}
           subtitle={classLabel}
@@ -601,7 +602,7 @@ export function GradingWorkspaceClient({
   }
 
   return (
-    <div className="flex h-[calc(100vh-36px)]">
+    <div className="flex h-[calc(100dvh-5.25rem)] md:h-[calc(100vh-var(--platform-switcher-height))]">
       <GradingStudentSidebar
         examTitle={examTitle}
         subtitle={classLabel}

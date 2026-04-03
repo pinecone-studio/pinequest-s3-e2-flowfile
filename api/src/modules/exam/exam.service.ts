@@ -106,7 +106,7 @@ export class ExamService {
       description: dto.description ?? null,
       status: 'draft',
       durationMinutes: dto.durationMinutes,
-      shuffleQuestions: dto.shuffleQuestions ?? false,
+      shuffleQuestions: dto.shuffleQuestions ?? true,
       allowCopyPaste: dto.allowCopyPaste ?? false,
       requireFullscreen: dto.requireFullscreen ?? true,
       maxTabSwitches: dto.maxTabSwitches ?? 3,

@@ -18,18 +18,20 @@ export function ClassExamRow({
   exam,
   stats,
   subjectName,
+  href,
 }: {
   assignment: ExamAssignment
   exam: Exam
   stats: ExamStats
   subjectName: string
+  href?: string
 }) {
   const isPast = assignment.status === 'closed'
   const statusConfig = STATUS_CONFIG[assignment.status] || STATUS_CONFIG.scheduled
 
   return (
     <Link
-      href={`/teacher/exams/${assignment.id}`}
+      href={href ?? `/teacher/exams/${assignment.id}`}
       className="block bg-white rounded-[10px] border p-4 transition-all duration-150 hover:-translate-y-0.5"
       style={{ borderColor: '#DDE1E7', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}
       onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.09)' }}

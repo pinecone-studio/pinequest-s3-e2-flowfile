@@ -1,5 +1,6 @@
 import {
   Archive,
+  Bell,
   BookOpen,
   CalendarDays,
   CheckSquare,
@@ -18,4 +19,5 @@ export const teacherNavItems: TeacherNavItem[] = [
   { icon: Archive, label: 'Шалгалтын сан', href: '/teacher/bank', matchPaths: ['/teacher/bank'] },
   { icon: CheckSquare, label: 'Үнэлгээ', href: '/teacher/grading', matchPaths: ['/teacher/grading'] },
   { icon: CalendarDays, label: 'Хуваарь', href: '/teacher/schedule', matchPaths: ['/teacher/schedule'] },
+  { icon: Bell, label: 'Мэдэгдэл', href: '/teacher/notifications', matchPaths: ['/teacher/notifications'] },
 ]

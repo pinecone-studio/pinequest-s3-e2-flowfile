@@ -10,6 +10,15 @@ import {
   initialExams,
   initialQuestions,
 } from '@/lib/data'
+import {
+  fetchTeacherUnreadNotificationCount,
+  isApiConfigured,
+} from '@/lib/api/notifications'
+import {
+  getNotificationEventName,
+  getNotifications,
+  getTeacherNotificationRefreshEventName,
+} from '@/lib/notifications'
 import type { Attempt, Exam, ExamAssignment, Question } from '@/lib/types'
 
 import type { TeacherNavItem } from '@/features/teacher/teacher-shell/types/teacher-shell.types'
@@ -20,6 +29,7 @@ export function useTeacherShell(): {
   mobileOpen: boolean
   setMobileOpen: (value: boolean | ((prev: boolean) => boolean)) => void
   pendingManualTaskCount: number
+  unreadNotificationCount: number
   teacher: ReturnType<typeof getCurrentTeacher>
   isActive: (item: TeacherNavItem) => boolean
 } {
@@ -30,6 +40,7 @@ export function useTeacherShell(): {
   const [assignments, setAssignments] = useState<ExamAssignment[]>(initialExamAssignments)
   const [attempts, setAttempts] = useState<Attempt[]>(initialAttempts)
   const [questions, setQuestions] = useState<Question[]>(initialQuestions)
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
   const teacher = getCurrentTeacher()
 
   useEffect(() => {
@@ -42,6 +53,60 @@ export function useTeacherShell(): {
     if (loadedAssignments.length) setAssignments(loadedAssignments)
     if (loadedAttempts.length) setAttempts(loadedAttempts)
     if (loadedQuestions.length) setQuestions(loadedQuestions)
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const syncUnreadCount = async () => {
+      try {
+        if (isApiConfigured()) {
+          const response = await fetchTeacherUnreadNotificationCount()
+
+          if (isMounted) {
+            setUnreadNotificationCount(response.unreadCount)
+          }
+
+          return
+        }
+
+        if (isMounted) {
+          setUnreadNotificationCount(
+            getNotifications(CURRENT_TEACHER_ID).filter((item) => !item.isRead).length,
+          )
+        }
+      } catch {
+        if (!isMounted) {
+          return
+        }
+
+        setUnreadNotificationCount(0)
+      }
+    }
+
+    void syncUnreadCount()
+
+    const syncEvents = isApiConfigured()
+      ? ([getTeacherNotificationRefreshEventName(), 'focus'] as const)
+      : ([getNotificationEventName(), 'storage', 'focus'] as const)
+
+    const handleSync = () => {
+      void syncUnreadCount()
+    }
+
+    syncEvents.forEach((eventName) => {
+      window.addEventListener(eventName, handleSync)
+    })
+
+    const intervalId = window.setInterval(handleSync, isApiConfigured() ? 15000 : 30000)
+
+    return () => {
+      isMounted = false
+      syncEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, handleSync)
+      })
+      window.clearInterval(intervalId)
+    }
   }, [])
 
   const getExam = (examId: string): Exam | undefined => exams.find(exam => exam.id === examId)
@@ -85,6 +150,7 @@ export function useTeacherShell(): {
     mobileOpen,
     setMobileOpen,
     pendingManualTaskCount,
+    unreadNotificationCount,
     teacher,
     isActive,
   }

@@ -1,7 +1,14 @@
 import type { Course, Question, Exam, QuestionType, SchoolClass } from '@/lib/types'
 import { SUBJECT_NAMES } from '@/lib/constants'
 import { CURRENT_TEACHER_ID, save } from '@/lib/data'
-import { createExam, createQuestion, isApiConfigured } from '@/lib/api/teacher-exams'
+import {
+  createExam,
+  createQuestion,
+  enrollStudent,
+  isApiConfigured,
+  updateExamStatus,
+} from '@/lib/api/teacher-exams'
+import { getAuthHeaders } from '@/lib/api/client'
 import { buildExamAssignmentNotifications, saveNotifications } from '@/lib/notifications'
 import { serializeQuestionForApi } from '@/lib/exam-question-meta'
 export type ImportedQuestionPayload = {
@@ -14,13 +21,19 @@ export type ImportFailure = { fileName: string; reason: string }
 export const stepLabels = ['Эх сурвалж', 'Ерөнхий мэдээлэл', 'Асуултууд', 'Хуваарь']
 const MANUAL_QUESTION_TYPES: QuestionType[] = ['short', 'long', 'formula', 'chemistry', 'code', 'voice', 'video', 'handwritten']
 
-function getDevAuthHeaders() {
+function getDevAuthHeaders(): Headers | undefined {
   if (typeof window === 'undefined') {
     return undefined
   }
 
-  const token = window.localStorage.getItem('seedcone.dev_auth_token')
-  return token ? { Authorization: `Bearer ${token}` } : undefined
+  const headers = new Headers()
+  const authHeaders = getAuthHeaders('teacher')
+
+  if (authHeaders.Authorization) {
+    headers.set('Authorization', authHeaders.Authorization)
+  }
+
+  return headers
 }
 
 function getImportApiUrl() {
@@ -41,9 +54,7 @@ async function postImportFile(file: File, fields: {
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      ...getDevAuthHeaders(),
-    },
+    headers: getDevAuthHeaders(),
     body: formData,
   })
 
@@ -91,6 +102,163 @@ export function mapImportedQuestions(items: ImportedQuestionPayload[], existingC
     else if (typeof item.correctAnswer === 'string' && item.correctAnswer.trim()) { q.correctAnswer = item.correctAnswer.trim() }
     acc.push(q); return acc
   }, [])
+}
+
+function resolveChoiceOption(
+  question: Question,
+  rawValue: string,
+) {
+  const normalized = rawValue.trim()
+
+  if (!question.options?.length) {
+    return normalized
+  }
+
+  const optionByExactMatch = question.options.find(
+    (option) => option.trim().toLowerCase() === normalized.toLowerCase(),
+  )
+
+  if (optionByExactMatch) {
+    return optionByExactMatch
+  }
+
+  const token = normalized.replace(/^[\[(]?(.+?)[\])]?.?$/, '$1').trim().toUpperCase()
+  const latinIndex = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.indexOf(token)
+  const cyrillicIndex = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З'].indexOf(token)
+  const numericIndex = Number(token)
+
+  if (latinIndex >= 0 && latinIndex < question.options.length) {
+    return question.options[latinIndex]
+  }
+
+  if (cyrillicIndex >= 0 && cyrillicIndex < question.options.length) {
+    return question.options[cyrillicIndex]
+  }
+
+  if (Number.isFinite(numericIndex) && numericIndex >= 1 && numericIndex <= question.options.length) {
+    return question.options[numericIndex - 1]
+  }
+
+  return normalized
+}
+
+function resolveImportedCorrectAnswer(
+  question: Question,
+  rawValue: string,
+) {
+  const normalized = rawValue.trim()
+
+  if (!normalized) {
+    return undefined
+  }
+
+  if (question.type === 'truefalse') {
+    const lower = normalized.toLowerCase()
+
+    if (
+      lower === 'true' ||
+      lower === 't' ||
+      lower === 'үнэн' ||
+      lower === 'unen' ||
+      lower === 'yes'
+    ) {
+      return 'true'
+    }
+
+    if (
+      lower === 'false' ||
+      lower === 'f' ||
+      lower === 'худал' ||
+      lower === 'hudal' ||
+      lower === 'no'
+    ) {
+      return 'false'
+    }
+  }
+
+  if (question.type === 'single') {
+    return resolveChoiceOption(question, normalized)
+  }
+
+  if (question.type === 'multiple') {
+    return normalized
+      .split(/[,\s/;]+/)
+      .map((item) => resolveChoiceOption(question, item))
+      .filter(Boolean)
+  }
+
+  return normalized
+}
+
+export function applyBulkAnswerKeyToQuestions(
+  questions: Question[],
+  answerKeyInput: string,
+) {
+  const lines = answerKeyInput
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) {
+    return {
+      questions,
+      appliedCount: 0,
+    }
+  }
+
+  const indexedAnswers = new Map<number, string>()
+  const sequentialAnswers: string[] = []
+
+  for (const line of lines) {
+    const matchedLine = line.match(/^(\d+(?:\.\d+)*)\s*[:=.)-]?\s*(.+)$/)
+
+    if (!matchedLine) {
+      sequentialAnswers.push(line)
+      continue
+    }
+
+    const numericSegments = matchedLine[1].split('.')
+    const index = Number(numericSegments[numericSegments.length - 1])
+
+    if (Number.isFinite(index) && index >= 1) {
+      indexedAnswers.set(index, matchedLine[2].trim())
+      continue
+    }
+
+    sequentialAnswers.push(matchedLine[2].trim())
+  }
+
+  let appliedCount = 0
+
+  return {
+    questions: questions.map((question, index) => {
+      const rawValue =
+        indexedAnswers.get(index + 1) ??
+        (indexedAnswers.size === 0 ? sequentialAnswers[index] : undefined)
+
+      if (!rawValue) {
+        return question
+      }
+
+      const resolvedAnswer = resolveImportedCorrectAnswer(question, rawValue)
+
+      if (
+        resolvedAnswer === undefined ||
+        (typeof resolvedAnswer === 'string' && resolvedAnswer.trim().length === 0) ||
+        (Array.isArray(resolvedAnswer) && resolvedAnswer.length === 0)
+      ) {
+        return question
+      }
+
+      appliedCount += 1
+
+      return {
+        ...question,
+        correctAnswer: resolvedAnswer,
+      }
+    }),
+    appliedCount,
+  }
 }
 
 export async function processImportFiles(files: File[], title: string, courseLabel: string) {
@@ -159,8 +327,9 @@ export async function saveExamPayload(params: {
       const result = await createExam({
         title,
         subject: selectedCourse.subjectId || 'МАТ',
+        description: description || undefined,
         durationMinutes: duration,
-        shuffleQuestions: false,
+        shuffleQuestions: true,
         allowCopyPaste: false,
         requireFullscreen: true,
         maxTabSwitches: 3,
@@ -180,6 +349,30 @@ export async function saveExamPayload(params: {
           correctAnswer: serializedQuestion.correctAnswer,
         })
       }
+
+      const selectedStudentIds = Array.from(
+        new Set(
+          classes
+            .filter((schoolClass) => selectedClasses.includes(schoolClass.id))
+            .flatMap((schoolClass) => schoolClass.studentIds),
+        ),
+      )
+
+      if (selectedStudentIds.length > 0) {
+        await Promise.allSettled(
+          selectedStudentIds.map((studentId) => enrollStudent(result.id, studentId)),
+        )
+      }
+
+      const nextStatus =
+        selectedClasses.length === 0
+          ? 'draft'
+          : startsAt && new Date(startsAt) > new Date()
+            ? 'scheduled'
+            : 'published'
+
+      await updateExamStatus(result.id, nextStatus)
+
       return result
     } catch {
       // fall through to local save

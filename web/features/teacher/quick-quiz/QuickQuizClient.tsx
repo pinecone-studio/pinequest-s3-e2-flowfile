@@ -1,12 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { Copy, QrCode, Radio, RefreshCw, Sparkles } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/hooks/use-toast'
 import { getAll, initialClasses, initialCourses, initialUsers } from '@/lib/data'
-import type { Course, Question, SchoolClass } from '@/lib/types'
+import { QUESTION_TYPE_LABELS, type Course, type Question, type SchoolClass } from '@/lib/types'
 import { SUBJECT_NAMES } from '@/lib/constants'
+import { isLocalShareUrl } from '@/lib/share-links'
 import {
   createExam,
   createQuestion,
@@ -29,8 +32,11 @@ import {
   buildQuickQuizQrUrl,
   buildQuickQuizShareUrl,
   buildQuickQuizTitle,
+  generateAllTaskDemoQuestions,
   generateQuickQuizQuestions,
+  normalizeQuickQuizState,
   readStoredQuickQuiz,
+  resolveQuickQuizShareOrigin,
   writeStoredQuickQuiz,
   type QuickQuizState,
 } from './quickQuizUtils'
@@ -145,6 +151,7 @@ export function QuickQuizClient() {
   const [durationMinutes, setDurationMinutes] = useState(10)
   const [previewQuestions, setPreviewQuestions] = useState<Question[]>([])
   const [quizState, setQuizState] = useState<QuickQuizState | null>(null)
+  const [showGeneratedPanels, setShowGeneratedPanels] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [liveSessions, setLiveSessions] = useState<ExamSession[]>([])
@@ -154,6 +161,7 @@ export function QuickQuizClient() {
     Record<string, TeacherExamAnswer[]>
   >({})
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const generatedSectionRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const storedCourses = getAll<Course>('courses')
@@ -167,15 +175,195 @@ export function QuickQuizClient() {
       setClasses(storedClasses)
     }
 
-    const storedQuiz = readStoredQuickQuiz()
+    const storedQuiz = readStoredQuickQuiz(resolveQuickQuizShareOrigin())
     if (storedQuiz) {
       setQuizState(storedQuiz)
+      setShowGeneratedPanels(true)
     }
   }, [])
 
+  useEffect(() => {
+    if (!showGeneratedPanels || !quizState || !generatedSectionRef.current) {
+      return
+    }
+
+    generatedSectionRef.current.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }, [quizState, showGeneratedPanels])
+
   const selectedCourse = courses.find((course) => course.id === courseId)
   const selectedClass = classes.find((schoolClass) => schoolClass.id === classId)
-  const courseLabel = formatCourseLabel(selectedCourse)
+
+  const createQuizFromQuestions = async (params: {
+    questionsToCreate: Question[]
+    title: string
+    description: string
+    topicLabel: string
+    durationMinutesValue: number
+    successTitle: string
+    successDescription: string
+    fallbackCourse?: Course
+  }) => {
+    if (isCreating) {
+      return
+    }
+
+    const activeCourse = selectedCourse ?? params.fallbackCourse
+    const activeClass = selectedClass
+
+    setPreviewQuestions(params.questionsToCreate)
+    setIsCreating(true)
+
+    try {
+      if (isApiConfigured()) {
+        const apiStudents = await fetchUsersByRole('student')
+
+        if (apiStudents.length === 0) {
+          throw new Error('Бүртгэлтэй сурагч олдсонгүй.')
+        }
+
+        const classStudentIds = activeClass
+          ? new Set(activeClass.studentIds)
+          : null
+        const matchedStudents = classStudentIds
+          ? apiStudents.filter((student) => classStudentIds.has(student.id))
+          : apiStudents
+        const enrolledStudents =
+          matchedStudents.length > 0 ? matchedStudents : apiStudents
+        const now = new Date()
+        const endsAt = new Date(now.getTime() + params.durationMinutesValue * 60 * 1000)
+        const exam = await createExam({
+          title: params.title,
+          subject: activeCourse?.subjectId ?? 'QUIZ',
+          description: params.description,
+          durationMinutes: params.durationMinutesValue,
+          shuffleQuestions: true,
+          allowCopyPaste: false,
+          requireFullscreen: false,
+          maxTabSwitches: 5,
+          startsAt: now.toISOString(),
+          endsAt: endsAt.toISOString(),
+        })
+
+        for (const [index, question] of params.questionsToCreate.entries()) {
+          const serialized = serializeQuestionForApi(question)
+
+          await createQuestion(exam.id, {
+            content: question.text,
+            inputType: serialized.inputType,
+            points: question.points,
+            orderIndex: index + 1,
+            isRequired: true,
+            subjectHint: serialized.subjectHint,
+            optionsJson: serialized.optionsJson,
+            correctAnswer: serialized.correctAnswer,
+          })
+        }
+
+        await Promise.all(
+          enrolledStudents.map((student) => enrollStudent(exam.id, student.id)),
+        )
+        await updateExamStatus(exam.id, 'published')
+
+        const shareUrl = buildQuickQuizShareUrl(
+          exam.id,
+          resolveQuickQuizShareOrigin(),
+        )
+        const createdState: QuickQuizState = normalizeQuickQuizState({
+          examId: exam.id,
+          title: params.title,
+          shareUrl,
+          qrCodeUrl: buildQuickQuizQrUrl(shareUrl),
+          questionCount: params.questionsToCreate.length,
+          durationMinutes: params.durationMinutesValue,
+          topic: params.topicLabel,
+          courseLabel: formatCourseLabel(activeCourse) || undefined,
+          classLabel: activeClass?.name,
+          createdAt: new Date().toISOString(),
+        })
+
+        setQuizState(createdState)
+        setShowGeneratedPanels(true)
+        writeStoredQuickQuiz(createdState)
+        setSelectedSessionId(null)
+
+        toast({
+          title: params.successTitle,
+          description:
+            activeClass && matchedStudents.length === 0
+              ? 'Сонгосон ангид таарах сурагч олдсонгүй. Иймээс бүх сурагчид нээлттэй болголоо.'
+              : params.successDescription,
+        })
+
+        return
+      }
+
+      if (!activeCourse) {
+        throw new Error('Хичээлээ сонгоно уу.')
+      }
+
+      const now = new Date()
+      const endsAt = new Date(now.getTime() + params.durationMinutesValue * 60 * 1000)
+      const formatPart = (value: Date) => value.toISOString().slice(0, 10)
+      const formatTime = (value: Date) => value.toISOString().slice(11, 16)
+      const exam = await saveExamPayload({
+        questions: params.questionsToCreate,
+        title: params.title,
+        selectedCourse: activeCourse,
+        chapter: 'Шуурхай quiz',
+        topic: params.topicLabel,
+        description: params.description,
+        duration: params.durationMinutesValue,
+        totalPoints: params.questionsToCreate.reduce(
+          (sum, question) => sum + question.points,
+          0,
+        ),
+        visibility: 'private',
+        selectedClasses: activeClass ? [activeClass.id] : [],
+        startDate: formatPart(now),
+        startTime: formatTime(now),
+        endDate: formatPart(endsAt),
+        endTime: formatTime(endsAt),
+        classes,
+      })
+
+      const shareUrl = buildQuickQuizShareUrl(
+        exam.id,
+        resolveQuickQuizShareOrigin(),
+      )
+      const createdState: QuickQuizState = normalizeQuickQuizState({
+        examId: exam.id,
+        title: params.title,
+        shareUrl,
+        qrCodeUrl: buildQuickQuizQrUrl(shareUrl),
+        questionCount: params.questionsToCreate.length,
+        durationMinutes: params.durationMinutesValue,
+        topic: params.topicLabel,
+        courseLabel: formatCourseLabel(activeCourse) || undefined,
+        classLabel: activeClass?.name,
+        createdAt: new Date().toISOString(),
+      })
+
+      setQuizState(createdState)
+      setShowGeneratedPanels(true)
+      writeStoredQuickQuiz(createdState)
+      toast({
+        title: params.successTitle,
+        description: params.successDescription,
+      })
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Шуурхай шалгалт үүсгэж чадсангүй',
+        description:
+          error instanceof Error ? error.message : 'Дахин оролдоно уу.',
+      })
+    } finally {
+      setIsCreating(false)
+    }
+  }
 
   const liveStudentMap = useMemo(
     () =>
@@ -284,6 +472,68 @@ export function QuickQuizClient() {
     )
   }
 
+  const handleFillDemo = () => {
+    const demoCourse = courses[0]
+    const demoClass =
+      classes.find((schoolClass) =>
+        demoCourse ? demoCourse.classIds.includes(schoolClass.id) : false,
+      ) ?? classes[0]
+    const demoTopic = 'Квадрат тэгшитгэл'
+    const demoSummary =
+      'ax² + bx + c = 0 хэлбэрийн тэгшитгэлийн язгуур, дискриминант, графиктай холбоотой суурь ойлголтууд.'
+
+    if (demoCourse) {
+      setCourseId(demoCourse.id)
+    }
+
+    if (demoClass) {
+      setClassId(demoClass.id)
+    }
+
+    setTopic(demoTopic)
+    setSummary(demoSummary)
+    setQuestionCount(5)
+    setDurationMinutes(10)
+    setPreviewQuestions(
+      generateQuickQuizQuestions({
+        topic: demoTopic,
+        summary: demoSummary,
+        count: 5,
+      }),
+    )
+  }
+
+  const handleCreateAllTaskDemoQuiz = async () => {
+    const fallbackCourse = selectedCourse ?? courses[0]
+    const demoTopic = 'Бүх төрлийн demo шалгалт'
+    const demoSummary =
+      'Нэг сонголт, олон сонголт, үнэн худал, тааруулах, богино ба урт текст, томъёо, химийн бүтэц, код, дуу, видео, гараар бичсэн хариултыг нэг дор турших жишиг шалгалт.'
+    const demoQuestions = generateAllTaskDemoQuestions(demoTopic)
+    const demoDuration = 25
+
+    if (fallbackCourse) {
+      setCourseId(fallbackCourse.id)
+    }
+
+    setTopic(demoTopic)
+    setSummary(demoSummary)
+    setQuestionCount(demoQuestions.length)
+    setDurationMinutes(demoDuration)
+    setPreviewQuestions(demoQuestions)
+
+    await createQuizFromQuestions({
+      questionsToCreate: demoQuestions,
+      title: demoTopic,
+      description: demoSummary,
+      topicLabel: demoTopic,
+      durationMinutesValue: demoDuration,
+      successTitle: 'Бүх төрлийн demo шалгалт бэлэн боллоо',
+      successDescription:
+        'QR кодоо нээгээд сурагч талаас бүх төрлийн хариултыг туршаад submit хийж болно.',
+      fallbackCourse,
+    })
+  }
+
   const handleCreateQuiz = async () => {
     if (!topic.trim() || !summary.trim() || isCreating) {
       return
@@ -294,148 +544,15 @@ export function QuickQuizClient() {
       summary,
       count: questionCount,
     })
-    const title = buildQuickQuizTitle(topic)
-    setPreviewQuestions(generatedQuestions)
-    setIsCreating(true)
-
-    try {
-      if (isApiConfigured()) {
-        const apiStudents = await fetchUsersByRole('student')
-
-        if (apiStudents.length === 0) {
-          throw new Error('API орчинд бүртгэлтэй сурагч олдсонгүй.')
-        }
-
-        const classStudentIds = selectedClass
-          ? new Set(selectedClass.studentIds)
-          : null
-        const matchedStudents = classStudentIds
-          ? apiStudents.filter((student) => classStudentIds.has(student.id))
-          : apiStudents
-        const enrolledStudents =
-          matchedStudents.length > 0 ? matchedStudents : apiStudents
-        const now = new Date()
-        const endsAt = new Date(now.getTime() + durationMinutes * 60 * 1000)
-        const exam = await createExam({
-          title,
-          subject: selectedCourse?.subjectId ?? 'QUIZ',
-          description: summary,
-          durationMinutes,
-          shuffleQuestions: false,
-          allowCopyPaste: false,
-          requireFullscreen: false,
-          maxTabSwitches: 5,
-          startsAt: now.toISOString(),
-          endsAt: endsAt.toISOString(),
-        })
-
-        for (const [index, question] of generatedQuestions.entries()) {
-          const serialized = serializeQuestionForApi(question)
-
-          await createQuestion(exam.id, {
-            content: question.text,
-            inputType: serialized.inputType,
-            points: question.points,
-            orderIndex: index + 1,
-            isRequired: true,
-            subjectHint: serialized.subjectHint,
-            optionsJson: serialized.optionsJson,
-            correctAnswer: serialized.correctAnswer,
-          })
-        }
-
-        await Promise.all(
-          enrolledStudents.map((student) => enrollStudent(exam.id, student.id)),
-        )
-        await updateExamStatus(exam.id, 'published')
-
-        const shareOrigin =
-          process.env.NEXT_PUBLIC_APP_URL?.trim() || window.location.origin
-        const shareUrl = buildQuickQuizShareUrl(exam.id, shareOrigin)
-        const createdState: QuickQuizState = {
-          examId: exam.id,
-          title,
-          shareUrl,
-          qrCodeUrl: buildQuickQuizQrUrl(shareUrl),
-          questionCount: generatedQuestions.length,
-          durationMinutes,
-          topic,
-          courseLabel: courseLabel || undefined,
-          classLabel: selectedClass?.name,
-          createdAt: new Date().toISOString(),
-        }
-
-        setQuizState(createdState)
-        writeStoredQuickQuiz(createdState)
-        setSelectedSessionId(null)
-
-        toast({
-          title: 'Quick quiz бэлэн боллоо',
-          description:
-            selectedClass && matchedStudents.length === 0
-              ? 'Сонгосон ангитай тохирох API сурагч олдоогүй тул бүх API сурагчдад нээлттэй болголоо.'
-              : 'QR code-оо нээгээд сурагчдадаа тараагаарай.',
-        })
-
-        return
-      }
-
-      if (!selectedCourse) {
-        throw new Error('Local mode дээр course сонгоно уу.')
-      }
-
-      const now = new Date()
-      const endsAt = new Date(now.getTime() + durationMinutes * 60 * 1000)
-      const formatPart = (value: Date) => value.toISOString().slice(0, 10)
-      const formatTime = (value: Date) => value.toISOString().slice(11, 16)
-      const exam = await saveExamPayload({
-        questions: generatedQuestions,
-        title,
-        selectedCourse,
-        chapter: 'Шуурхай quiz',
-        topic,
-        description: summary,
-        duration: durationMinutes,
-        totalPoints: generatedQuestions.reduce((sum, question) => sum + question.points, 0),
-        visibility: 'private',
-        selectedClasses: selectedClass ? [selectedClass.id] : [],
-        startDate: formatPart(now),
-        startTime: formatTime(now),
-        endDate: formatPart(endsAt),
-        endTime: formatTime(endsAt),
-        classes,
-      })
-
-      const shareUrl = buildQuickQuizShareUrl(exam.id, window.location.origin)
-      const createdState: QuickQuizState = {
-        examId: exam.id,
-        title,
-        shareUrl,
-        qrCodeUrl: buildQuickQuizQrUrl(shareUrl),
-        questionCount: generatedQuestions.length,
-        durationMinutes,
-        topic,
-        courseLabel: courseLabel || undefined,
-        classLabel: selectedClass?.name,
-        createdAt: new Date().toISOString(),
-      }
-
-      setQuizState(createdState)
-      writeStoredQuickQuiz(createdState)
-      toast({
-        title: 'Quick quiz хадгалагдлаа',
-        description: 'Live monitor нь API тохиргоотой үед ажиллана.',
-      })
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Quick quiz үүсгэж чадсангүй',
-        description:
-          error instanceof Error ? error.message : 'Дахин оролдоно уу.',
-      })
-    } finally {
-      setIsCreating(false)
-    }
+    await createQuizFromQuestions({
+      questionsToCreate: generatedQuestions,
+      title: buildQuickQuizTitle(topic),
+      description: summary,
+      topicLabel: topic,
+      durationMinutesValue: durationMinutes,
+      successTitle: 'Шуурхай шалгалт бэлэн боллоо',
+      successDescription: 'QR кодоо нээгээд сурагчдадаа тараагаарай.',
+    })
   }
 
   const handleCopyLink = async () => {
@@ -549,11 +666,45 @@ export function QuickQuizClient() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_420px]">
         <div className="bg-white border rounded-[14px] p-6" style={{ borderColor: '#DDE1E7' }}>
-          <div className="flex items-center gap-2 mb-5">
-            <Sparkles size={18} strokeWidth={1.8} style={{ color: '#0066FF' }} />
-            <h2 className="text-[16px] font-semibold" style={{ color: '#1A1A2E' }}>
-              Quiz тохируулах
-            </h2>
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Sparkles size={18} strokeWidth={1.8} style={{ color: '#0066FF' }} />
+              <h2 className="text-[16px] font-semibold" style={{ color: '#1A1A2E' }}>
+                Quiz тохируулах
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={handleFillDemo}
+              className="rounded-lg border px-3 py-2 text-[12px] font-medium"
+              style={{ borderColor: '#DDE1E7', color: '#1A1A2E' }}
+            >
+              Demo
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const demoTopic = 'Бүх төрлийн demo шалгалт'
+                const demoSummary =
+                  'Нэг сонголт, олон сонголт, үнэн худал, тааруулах, богино ба урт текст, томъёо, химийн бүтэц, код, дуу, видео, гараар бичсэн хариултыг нэг дор турших жишиг шалгалт.'
+                const demoQuestions = generateAllTaskDemoQuestions(demoTopic)
+                const fallbackCourse = selectedCourse ?? courses[0]
+
+                if (fallbackCourse) {
+                  setCourseId(fallbackCourse.id)
+                }
+
+                setTopic(demoTopic)
+                setSummary(demoSummary)
+                setQuestionCount(demoQuestions.length)
+                setDurationMinutes(25)
+                setPreviewQuestions(demoQuestions)
+              }}
+              className="rounded-lg border px-3 py-2 text-[12px] font-medium"
+              style={{ borderColor: '#DDE1E7', color: '#1A1A2E' }}
+            >
+              Бүх төрөл
+            </button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -586,7 +737,7 @@ export function QuickQuizClient() {
                 className="w-full px-3.5 py-2.5 border rounded-lg text-[14px] bg-white"
                 style={{ borderColor: '#DDE1E7' }}
               >
-                <option value="">Бүх API сурагч</option>
+                <option value="">Бүх сурагч</option>
                 {classes.map((schoolClass) => (
                   <option key={schoolClass.id} value={schoolClass.id}>
                     {schoolClass.name}
@@ -613,13 +764,12 @@ export function QuickQuizClient() {
             <label className="block text-[13px] font-medium mb-1.5" style={{ color: '#1A1A2E' }}>
               Товч агуулга
             </label>
-            <textarea
+            <Textarea
               value={summary}
               onChange={(event) => setSummary(event.target.value)}
               placeholder="Өнөөдөр ямар ойлголт, жишээ, томьёо, дүрэм үзсэнээ товч бичээрэй."
               rows={6}
-              className="w-full px-3.5 py-2.5 border rounded-lg text-[14px] resize-none"
-              style={{ borderColor: '#DDE1E7' }}
+              className="min-h-[144px] resize-none border-[#DDE1E7] bg-white px-3.5 py-2.5 text-[14px]"
             />
           </div>
 
@@ -678,10 +828,18 @@ export function QuickQuizClient() {
             >
               {isCreating ? 'Үүсгэж байна...' : 'QR-тай quiz үүсгэх'}
             </button>
+            <button
+              onClick={() => void handleCreateAllTaskDemoQuiz()}
+              disabled={isCreating}
+              className="px-4 py-2 rounded-lg text-[13px] font-medium border disabled:opacity-50"
+              style={{ borderColor: '#DDE1E7', color: '#1A1A2E' }}
+            >
+              {isCreating ? 'Үүсгэж байна...' : 'Бүх төрлийн demo шалгалт'}
+            </button>
           </div>
 
           <div className="mt-4 text-[12px]" style={{ color: '#8A94A0' }}>
-            API орчинд энэ quiz нь ердийн student exam UI дээр нээгдэнэ. Class сонгосон ч API дахь student ID-тай таарахгүй бол бүх API сурагчдад нээлттэй болно.
+            Энэ quiz QR-аар шууд нээгдэнэ. Хэрэв сонгосон ангид таарах сурагч олдохгүй бол бүх сурагчид нээлттэй болно.
           </div>
         </div>
 
@@ -706,7 +864,7 @@ export function QuickQuizClient() {
                       Асуулт {index + 1}
                     </span>
                     <span className="text-[11px]" style={{ color: '#8A94A0' }}>
-                      {question.type === 'truefalse' ? 'Үнэн / Худал' : 'Сонгох'}
+                      {QUESTION_TYPE_LABELS[question.type]}
                     </span>
                   </div>
                   <div className="text-[14px] leading-6" style={{ color: '#1A1A2E' }}>
@@ -730,6 +888,29 @@ export function QuickQuizClient() {
                       ))}
                     </div>
                   )}
+                  {question.matchingPairs && (
+                    <div className="mt-3 space-y-2">
+                      {question.matchingPairs.map((pair) => (
+                        <div
+                          key={`${pair.left}-${pair.right}`}
+                          className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-[13px]"
+                          style={{ backgroundColor: '#F3F5F8', color: '#5A6474' }}
+                        >
+                          <span>{pair.left}</span>
+                          <span>↔</span>
+                          <span>{pair.right}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!question.options && !question.matchingPairs && (
+                    <div
+                      className="mt-3 rounded-lg px-3 py-2 text-[13px]"
+                      style={{ backgroundColor: '#F3F5F8', color: '#5A6474' }}
+                    >
+                      Нээлттэй хариулттай даалгавар
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -744,24 +925,32 @@ export function QuickQuizClient() {
         </div>
       </div>
 
-      {quizState && (
-        <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+      {quizState && showGeneratedPanels && (
+        <div
+          ref={generatedSectionRef}
+          className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]"
+        >
           <div className="bg-white border rounded-[14px] p-6" style={{ borderColor: '#DDE1E7' }}>
             <div className="flex items-center gap-2 mb-4">
               <QrCode size={18} strokeWidth={1.8} style={{ color: '#0066FF' }} />
               <h2 className="text-[16px] font-semibold" style={{ color: '#1A1A2E' }}>
-                QR Share
+                QR код
               </h2>
             </div>
             <div
               className="rounded-[18px] p-4 border mb-4"
               style={{ borderColor: '#E6EAF0', backgroundColor: '#FAFBFD' }}
             >
-              <img
-                src={quizState.qrCodeUrl}
-                alt="Quick quiz QR code"
-                className="w-full rounded-[14px] bg-white"
-              />
+              <div className="mx-auto w-full max-w-[220px] rounded-[14px] bg-white">
+                <Image
+                  src={quizState.qrCodeUrl}
+                  alt="Шуурхай шалгалтын QR код"
+                  width={220}
+                  height={220}
+                  className="h-auto w-full rounded-[14px] bg-white"
+                  unoptimized
+                />
+              </div>
             </div>
             <div className="space-y-2 mb-4">
               <div className="text-[15px] font-semibold" style={{ color: '#1A1A2E' }}>
@@ -769,7 +958,7 @@ export function QuickQuizClient() {
               </div>
               <div className="text-[12px]" style={{ color: '#5A6474' }}>
                 {quizState.courseLabel ? `${quizState.courseLabel} • ` : ''}
-                {quizState.classLabel ?? 'Бүх API сурагч'}
+                {quizState.classLabel ?? 'Бүх сурагч'}
               </div>
               <div className="text-[12px]" style={{ color: '#5A6474' }}>
                 {quizState.questionCount} асуулт • {quizState.durationMinutes} минут
@@ -788,7 +977,7 @@ export function QuickQuizClient() {
                 style={{ borderColor: '#DDE1E7', color: '#1A1A2E' }}
               >
                 <Copy size={14} strokeWidth={1.8} />
-                Link хуулах
+                Холбоос хуулах
               </button>
               <a
                 href={quizState.shareUrl}
@@ -797,12 +986,12 @@ export function QuickQuizClient() {
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium text-white"
                 style={{ backgroundColor: '#1A7A4A' }}
               >
-                Student view
+                Шалгалтыг нээх
               </a>
             </div>
-            {quizState.shareUrl.includes('localhost') && (
+            {isLocalShareUrl(quizState.shareUrl) && (
               <p className="mt-3 text-[12px]" style={{ color: '#B45309' }}>
-                `localhost` link нь өөр төхөөрөмж дээр нээгдэхгүй байж магадгүй. Хэрэв утсаар scan хийх бол LAN IP эсвэл public URL ашиглаарай.
+                Энэ холбоос өөр төхөөрөмж дээр шууд нээгдэхгүй байж магадгүй. Утсаар scan хийх бол нийтэд нээгдэх хаяг ашиглаарай.
               </p>
             )}
           </div>
@@ -812,7 +1001,7 @@ export function QuickQuizClient() {
               <div className="flex items-center justify-between gap-4 mb-5">
                 <div>
                   <h2 className="text-[16px] font-semibold" style={{ color: '#1A1A2E' }}>
-                    Live Monitor
+                    Шууд хяналт
                   </h2>
                   <p className="text-[12px]" style={{ color: '#5A6474' }}>
                     Сурагчдын илгээсэн хариулт, явц, оноо энд шууд шинэчлэгдэнэ.
@@ -1004,7 +1193,7 @@ export function QuickQuizClient() {
                 </>
               ) : (
                 <div className="rounded-xl border border-dashed px-5 py-10 text-center text-[13px]" style={{ borderColor: '#DDE1E7', color: '#8A94A0' }}>
-                  Live monitor нь `NEXT_PUBLIC_API_BASE_URL` тохиргоотой үед ажиллана.
+                  Сурагчид шалгалтад орж эхэлмэгц энд явц нь харагдана.
                 </div>
               )}
             </div>

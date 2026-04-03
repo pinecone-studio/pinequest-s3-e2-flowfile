@@ -9,7 +9,7 @@ interface TabSubmittedProps {
   initialQuestions?: Array<{ id: string; text?: string; content?: string; points?: number }>
 }
 
-export function TabSubmitted({ exam, initialResults = [], initialQuestions = [] }: TabSubmittedProps) {
+export function TabSubmitted({ exam, initialQuestions = [] }: TabSubmittedProps) {
   const [analytics, setAnalytics] = useState<QuestionAnalytics[] | null>(null)
 
   useEffect(() => {
