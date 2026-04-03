@@ -16,8 +16,13 @@ async function bootstrap() {
   }
 
   app.enableCors({
-    origin: true,
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? (process.env.FRONTEND_URL ?? 'https://e-shalgalt.vercel.app')
+        : true,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   app.use(express.json({ limit: '25mb' }));

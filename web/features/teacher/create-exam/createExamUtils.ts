@@ -2,9 +2,6 @@ import type { Course, Question, Exam, QuestionType } from '@/lib/types'
 import { SUBJECT_NAMES } from '@/lib/constants'
 import { CURRENT_TEACHER_ID, save } from '@/lib/data'
 import { buildExamAssignmentNotifications, saveNotifications } from '@/lib/notifications'
-import { getApiUrl, isApiConfigured } from '@/lib/api/client'
-import { createExam, createQuestion } from '@/lib/api/teacher-exams'
-
 export type ImportedQuestionPayload = {
   question?: string; type?: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay'
   options?: string[]; correctAnswer?: string | string[]; points?: number
@@ -25,28 +22,39 @@ function getDevAuthHeaders() {
 }
 
 function getImportApiUrl() {
-  return getApiUrl('/parse-exam')
+  return '/api/parse-exam'
 }
 
-async function postImportPayload(
-  payload: Record<string, unknown>,
-) {
+async function postImportFile(file: File, fields: {
+  title: string
+  courseLabel: string
+}) {
   const url = getImportApiUrl()
-
-  if (!url) {
-    throw new Error('NEXT_PUBLIC_API_BASE_URL is not configured.')
-  }
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('fileName', file.name)
+  formData.append('fileType', file.type)
+  formData.append('title', fields.title)
+  formData.append('courseLabel', fields.courseLabel)
 
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
       ...getDevAuthHeaders(),
     },
-    body: JSON.stringify(payload),
+    body: formData,
   })
 
-  const data = (await response.json()) as ImportApiResponse
+  const raw = await response.text()
+  let data: ImportApiResponse
+
+  try {
+    data = JSON.parse(raw) as ImportApiResponse
+  } catch {
+    data = {
+      error: raw || 'Файл боловсруулах хүсэлт амжилтгүй боллоо.',
+    }
+  }
 
   if (!response.ok) {
     throw new Error(data.error || 'Файл боловсруулах хүсэлт амжилтгүй боллоо.')
@@ -58,11 +66,6 @@ async function postImportPayload(
 export function isManualQuestionType(type: QuestionType) { return MANUAL_QUESTION_TYPES.includes(type) }
 export function getCourseLabel(course: Course) {
   return `${SUBJECT_NAMES[course.subjectId] ?? course.subjectId} • ${course.grade}-р анги`
-}
-function arrayBufferToBase64(buffer: ArrayBuffer) {
-  let binary = ''; const bytes = new Uint8Array(buffer); const chunk = 0x8000
-  for (let i = 0; i < bytes.length; i += chunk) { binary += String.fromCharCode(...bytes.subarray(i, i + chunk)) }
-  return btoa(binary)
 }
 
 export function mapImportedQuestions(items: ImportedQuestionPayload[], existingCount: number): Question[] {
@@ -81,22 +84,10 @@ export function mapImportedQuestions(items: ImportedQuestionPayload[], existingC
 export async function processImportFiles(files: File[], title: string, courseLabel: string) {
   const collected: ImportedQuestionPayload[] = []; const skipped: string[] = []; const failures: ImportFailure[] = []; let usedLocalParser = false
   for (const file of files) {
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
-    const isBinary = ['docx', 'pdf'].includes(ext)
-
     let payload: ImportApiResponse
 
     try {
-      const fileText = isBinary ? '' : await file.text()
-      const fileBuffer = isBinary ? arrayBufferToBase64(await file.arrayBuffer()) : undefined
-      payload = await postImportPayload({
-        fileText,
-        fileBuffer,
-        fileType: file.type,
-        fileName: file.name,
-        title,
-        courseLabel,
-      })
+      payload = await postImportFile(file, { title, courseLabel })
     } catch (error) {
       skipped.push(file.name)
       failures.push({
